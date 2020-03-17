@@ -9,6 +9,8 @@ require 'graphiform/fields'
 module Graphiform
   def self.included(base)
     base.class_eval do
+      Graphiform.create_skeleton
+
       include Scopiform
 
       include Graphiform::ActiveRecordHelpers
