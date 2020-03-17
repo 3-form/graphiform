@@ -1,0 +1,13 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  reference: 
+  name: MyString
+  number: 1.5
+  datetime: 2020-03-16 20:30:37
+
+two:
+  reference: 
+  name: MyString
+  number: 1.5
+  datetime: 2020-03-16 20:30:37

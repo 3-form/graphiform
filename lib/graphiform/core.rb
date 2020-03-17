@@ -10,26 +10,29 @@ module Graphiform
 
     module ClassMethods
       def graphql_type
-        Helpers.get_const_or_create(demodulized_name, ::Types) do
+        local_demodulized_name = demodulized_name
+        Helpers.get_const_or_create(local_demodulized_name, ::Types) do
           Class.new(::Types::BaseObject) do
-            graphql_name demodulized_name
+            graphql_name local_demodulized_name
           end
         end
       end
 
       def graphql_input
-        Helpers.get_const_or_create(demodulized_name, ::Inputs) do
+        local_demodulized_name = demodulized_name
+        Helpers.get_const_or_create(local_demodulized_name, ::Inputs) do
           Class.new(::Inputs::BaseInput) do
-            graphql_name "#{demodulized_name}Input"
+            graphql_name "#{local_demodulized_name}Input"
           end
         end
       end
 
       def graphql_filter
-        unless @filter
-          @filter = Helpers.get_const_or_create(demodulized_name, ::Filters) do
-            Class.new(::Filters::BaseFilter) do
-              graphql_name "#{demodulized_name}Filter"
+        unless defined? @filter
+          local_demodulized_name = demodulized_name
+          @filter = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Filters) do
+            Class.new(::Inputs::Filters::BaseFilter) do
+              graphql_name "#{local_demodulized_name}Filter"
             end
           end
           @filter.class_eval do
@@ -40,11 +43,11 @@ module Graphiform
         @filter
       end
 
-      def graphql_sorting_filter
-        sorting_name = "#{demodulized_name}Sorting"
-        Helpers.get_const_or_create(sorting_name, ::Filters) do
-          Class.new(::Filters::BaseFilter) do
-            graphql_name sorting_name
+      def graphql_sort
+        local_demodulized_name = demodulized_name
+        Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Sorts) do
+          Class.new(::Inputs::Sorts::BaseSort) do
+            graphql_name "#{local_demodulized_name}Sort"
           end
         end
       end
@@ -61,16 +64,16 @@ module Graphiform
       def graphql_connection
         connection_name = "#{demodulized_name}Connection"
         Helpers.get_const_or_create(connection_name, ::Types) do
-          node_type = graphql_type
+          edge_type = graphql_edge
           Class.new(::Types::BaseConnection) do
             graphql_name connection_name
-            edge_type(node_type)
+            edge_type(edge_type)
           end
         end
       end
 
       def graphql_base_resolver
-        unless @base_resolver
+        unless defined? @base_resolver
           @base_resolver = Helpers.get_const_or_create(demodulized_name, ::Resolvers) do
             Class.new(::Resolvers::BaseResolver) do
               # Default resolver just returns the object to prevent exceptions
@@ -80,28 +83,46 @@ module Graphiform
             end
           end
 
-          resolver_filter_type = graphql_filter
-          resolver_sorting_type = graphql_sorting_filter
+          local_graphql_filter = graphql_filter
+          local_graphql_sort = graphql_sort
 
           @base_resolver.class_eval do
-            argument :where, resolver_filter_type, required: false
-            argument :order, resolver_sorting_type, required: false unless resolver_sorting_type.arguments.empty?
+            argument :where, local_graphql_filter, required: false
+            argument :sort, local_graphql_sort, required: false unless local_graphql_sort.arguments.empty?
           end
         end
 
         @base_resolver
       end
 
-      def graphql_connection_query
-        Helpers.get_const_or_create(demodulized_name, ::ConnectionQueries) do
-          model = self # TODO: I don't know if this will work or if it needs to be in upper scope
-          connection_type = graphql_connection
+      def graphql_query
+        Helpers.get_const_or_create(demodulized_name, ::Resolvers::Queries) do
+          model = self
+          local_graphql_type = graphql_type
           Class.new(graphql_base_resolver) do
-            type connection_type, null: false
+            type local_graphql_type, null: false
 
             define_method :resolve do |where: nil|
               val = model.all
               val = val.apply_filters(where.to_h) if where.present? && val.respond_to?(:apply_filters)
+
+              val.first
+            end
+          end
+        end
+      end
+
+      def graphql_connection_query
+        Helpers.get_const_or_create(demodulized_name, ::Resolvers::ConnectionQueries) do
+          model = self
+          connection_type = graphql_connection
+          Class.new(graphql_base_resolver) do
+            type connection_type, null: false
+
+            define_method :resolve do |where: nil, sort: nil|
+              val = model.all
+              val = val.apply_filters(where.to_h) if where.present? && val.respond_to?(:apply_filters)
+              val = val.apply_sorts(sort.to_h) if sort.present? && val.respond_to?(:apply_sorts)
 
               val
             end
@@ -123,6 +144,20 @@ module Graphiform
             return val.apply_filters(where_hash) if val.respond_to? :apply_filters
 
             val
+          end
+        end
+      end
+
+      def graphql_create_enum(enum_name)
+        enum_name = enum_name.to_s
+        enum_options = defined_enums[enum_name] || {}
+
+        enum_class_name = "#{demodulized_name}#{enum_name.pluralize.capitalize}"
+        Helpers.get_const_or_create(enum_class_name, ::Enums) do
+          Class.new(::Enums::BaseEnum) do
+            enum_options.each_key do |key|
+              value key
+            end
           end
         end
       end
