@@ -10,9 +10,13 @@ Warning.ignore(//, 'parser.y')
 Warning.ignore(//, '(eval)')
 Warning.ignore(//, '/System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/lib/ruby/2.6.0/forwardable.rb')
 
+# Spy warnings
+Warning.ignore(/previous definition of/)
+
 require_relative '../test/dummy/config/environment'
 ActiveRecord::Migrator.migrations_paths = [File.expand_path('../test/dummy/db/migrate', __dir__)]
 require 'rails/test_help'
+require 'spy'
 
 # Filter out Minitest backtrace while allowing backtrace from other libraries
 # to be shown.

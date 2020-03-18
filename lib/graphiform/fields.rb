@@ -26,6 +26,11 @@ module Graphiform
         name,
         type: nil,
         required: false,
+        write_prepare: nil,
+        prepare: nil,
+        description: nil,
+        default_value: ::GraphQL::Schema::Argument::NO_DEFAULT,
+        as: nil,
         **_options
       )
         name = name.to_sym
@@ -34,8 +39,17 @@ module Graphiform
 
         return Helpers.logger.warn "Graphiform: Missing `type` for argument #{name}" if argument_type.nil?
 
+        prepare = write_prepare || prepare
+
         graphql_input.class_eval do
-          argument argument_name, argument_type, required: required
+          argument \
+            argument_name,
+            argument_type,
+            required: required,
+            prepare: prepare,
+            description: description,
+            default_value: default_value,
+            as: as
         end
       end
 
@@ -79,7 +93,7 @@ module Graphiform
       end
 
       def graphql_resolve_argument_type(name, type)
-        return type if type.present?
+        return Helpers.graphql_type(type) if type.present?
 
         column_def = column(name)
 
@@ -160,9 +174,24 @@ module Graphiform
         end
       end
 
-      def graphql_add_field_to_type(field_name, type, null = nil)
+      def graphql_add_field_to_type(
+        field_name,
+        type,
+        null = nil,
+        description: nil,
+        deprecation_reason: nil,
+        method: nil,
+        read_prepare: nil,
+        **_options
+      )
         field_name = field_name.to_sym
-        field_options = {}
+        field_options = {
+          description: description,
+          deprecation_reason: deprecation_reason,
+          method: method,
+        }
+
+        type = Helpers.graphql_type(type)
 
         if Helpers.resolver?(type)
           field_options[:resolver] = type
@@ -172,19 +201,21 @@ module Graphiform
         end
 
         graphql_type.class_eval do
-          field(field_name, **field_options)
+          added_field = field(field_name, **field_options)
+
+          define_method(added_field.method_sym, -> { read_prepare.call(object.public_send(added_field.method_sym)) }) if read_prepare
         end
       end
 
-      def graphql_add_column_field(field_name, column_def, type: nil, null: nil, **_options)
+      def graphql_add_column_field(field_name, column_def, type: nil, null: nil, **options)
         type = :string if type.blank? && enum_attribute?(field_name)
-        type = Helpers.graphql_type(type || column_def.type)
+        type ||= column_def.type
         null = column_def.null if null.nil?
 
-        graphql_add_field_to_type(field_name, type, null)
+        graphql_add_field_to_type(field_name, type, null, **options)
       end
 
-      def graphql_add_association_field(field_name, association_def, type: nil, null: nil, **_options)
+      def graphql_add_association_field(field_name, association_def, type: nil, null: nil, **options)
         unless association_def.klass.respond_to?(:graphql_type)
           return Helpers.logger.warn(
             "Graphiform: `#{name}` trying to add association `#{field_name}` - `#{association_def.klass.name}` does not include Graphiform"
@@ -204,20 +235,21 @@ module Graphiform
           graphql_add_field_to_type(
             "#{field_name}_connection",
             klass.graphql_create_resolver(association_def.name, graphql_connection),
-            false
+            false,
+            **options
           )
         end
 
         type = has_many ? klass.graphql_create_resolver(association_def.name, [klass.graphql_type]) : klass.graphql_type if type.nil?
         null = association_def.macro != :has_many if null.nil?
 
-        graphql_add_field_to_type(field_name, type, null)
+        graphql_add_field_to_type(field_name, type, null, **options)
       end
 
-      def graphql_add_method_field(field_name, type:, null: true, **_options)
+      def graphql_add_method_field(field_name, type:, null: true, **options)
         return Helpers.logger.warn "Graphiform: Missing `type` for field `#{field_name}` in model `#{name}`" if type.nil?
 
-        graphql_add_field_to_type(field_name, type, null)
+        graphql_add_field_to_type(field_name, type, null, **options)
       end
     end
   end
