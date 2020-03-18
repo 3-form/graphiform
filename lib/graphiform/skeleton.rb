@@ -3,8 +3,6 @@ require 'graphiform/helpers'
 
 module Graphiform
   def self.create_skeleton
-    return if defined? @skeleton_created
-
     # Types
     Helpers.get_const_or_create('Types') do
       Module.new
@@ -89,7 +87,5 @@ module Graphiform
         value 'DESC', 'Sort results in descending order'
       end
     end
-
-    @skeleton_created = true
   end
 end
