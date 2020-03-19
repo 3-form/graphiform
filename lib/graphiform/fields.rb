@@ -93,6 +93,8 @@ module Graphiform
       end
 
       def graphql_resolve_argument_type(name, type)
+        type = graphql_create_enum(name) if type.blank? && enum_attribute?(name)
+
         return Helpers.graphql_type(type) if type.present?
 
         column_def = column(name)
@@ -203,19 +205,28 @@ module Graphiform
         graphql_type.class_eval do
           added_field = field(field_name, **field_options)
 
-          define_method(added_field.method_sym, -> { read_prepare.call(object.public_send(added_field.method_sym)) }) if read_prepare
+          if read_prepare
+            define_method(
+              added_field.method_sym,
+              -> { instance_exec(object.public_send(added_field.method_sym), context, &read_prepare) }
+            )
+          end
         end
       end
 
       def graphql_add_column_field(field_name, column_def, type: nil, null: nil, **options)
-        type = :string if type.blank? && enum_attribute?(field_name)
+        is_enum = type.blank? && enum_attribute?(field_name)
+        if is_enum
+          enum = graphql_create_enum(field_name)
+          type = enum
+        end
         type ||= column_def.type
         null = column_def.null if null.nil?
 
         graphql_add_field_to_type(field_name, type, null, **options)
       end
 
-      def graphql_add_association_field(field_name, association_def, type: nil, null: nil, **options)
+      def graphql_add_association_field(field_name, association_def, type: nil, null: nil, include_connection: true, read_prepare: nil, **options)
         unless association_def.klass.respond_to?(:graphql_type)
           return Helpers.logger.warn(
             "Graphiform: `#{name}` trying to add association `#{field_name}` - `#{association_def.klass.name}` does not include Graphiform"
@@ -231,19 +242,23 @@ module Graphiform
         has_many = association_def.macro == :has_many
         klass = association_def.klass
 
-        if has_many
+        if include_connection && has_many
           graphql_add_field_to_type(
             "#{field_name}_connection",
-            klass.graphql_create_resolver(association_def.name, graphql_connection),
+            klass.graphql_create_resolver(association_def.name, klass.graphql_connection, read_prepare: read_prepare),
             false,
             **options
           )
         end
 
-        type = has_many ? klass.graphql_create_resolver(association_def.name, [klass.graphql_type]) : klass.graphql_type if type.nil?
+        if type.nil?
+          type = has_many ? klass.graphql_create_resolver(association_def.name, [klass.graphql_type], read_prepare: read_prepare) : klass.graphql_type
+          read_prepare = nil if has_many
+        end
+
         null = association_def.macro != :has_many if null.nil?
 
-        graphql_add_field_to_type(field_name, type, null, **options)
+        graphql_add_field_to_type(field_name, type, null, read_prepare: read_prepare, **options)
       end
 
       def graphql_add_method_field(field_name, type:, null: true, **options)

@@ -130,7 +130,7 @@ module Graphiform
         end
       end
 
-      def graphql_create_resolver(method_name, resolver_type = graphql_type)
+      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, **_options)
         Class.new(graphql_base_resolver) do
           type resolver_type, null: false
 
@@ -140,6 +140,7 @@ module Graphiform
             val = super(**args)
 
             val = val.public_send(method_name) if val.respond_to? method_name
+            val = instance_exec(val, context, &read_prepare) if read_prepare
 
             return val.apply_filters(where_hash) if val.respond_to? :apply_filters
 
