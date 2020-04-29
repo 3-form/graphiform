@@ -19,21 +19,37 @@ module Graphiform
         graphql_add_method_field(name, **options) unless column_def.present? || association_def.present?
 
         graphql_add_scopes_to_filter(name)
-        graphql_field_to_sorting(name)
+        graphql_field_to_sort(name)
       end
 
       def graphql_writable_field(
         name,
         type: nil,
         required: false,
+        write_prepare: nil,
+        prepare: nil,
+        description: nil,
+        default_value: ::GraphQL::Schema::Argument::NO_DEFAULT,
+        as: nil,
         **_options
       )
         name = name.to_sym
         argument_name = graphql_resolve_argument_name(name)
         argument_type = graphql_resolve_argument_type(name, type)
 
+        return Helpers.logger.warn "Graphiform: Missing `type` for argument #{name}" if argument_type.nil?
+
+        prepare = write_prepare || prepare
+
         graphql_input.class_eval do
-          argument argument_name, argument_type, required: required
+          argument \
+            argument_name,
+            argument_type,
+            required: required,
+            prepare: prepare,
+            description: description,
+            default_value: default_value,
+            as: as
         end
       end
 
@@ -77,7 +93,9 @@ module Graphiform
       end
 
       def graphql_resolve_argument_type(name, type)
-        return type if type.present?
+        type = graphql_create_enum(name) if type.blank? && enum_attribute?(name)
+
+        return Helpers.graphql_type(type) if type.present?
 
         column_def = column(name)
 
@@ -85,12 +103,10 @@ module Graphiform
 
         association_def = association(name)
 
-        if association_def.present?
-          has_many = association_def.macro == :has_many
-          return has_many ? [association_def.klass.graphql_input] : association_def.klass.graphql_input
-        end
+        return nil unless Helpers.association_arguments_valid?(association_def, :graphql_input)
 
-        raise StandardError, 'Some sort of error' # TODO
+        has_many = association_def.macro == :has_many
+        has_many ? [association_def.klass.graphql_input] : association_def.klass.graphql_input
       end
 
       def graphql_add_scopes_to_filter(name)
@@ -100,10 +116,21 @@ module Graphiform
 
         association_def = association(name)
 
-        type = association_def.klass.graphql_filter if association_def.present?
+        if association_def.present?
+          return unless Helpers.association_arguments_valid?(association_def, :graphql_filter)
 
-        added_scopes.each do |added_scope|
-          add_scope_def_to_filter(added_scope, type || added_scope.options[:argument_type])
+          type = association_def.klass.graphql_filter
+        end
+
+        non_sort_by_scopes = added_scopes.select { |scope_def| !scope_def.options || scope_def.options[:type] != :sort }
+
+        non_sort_by_scopes.each do |added_scope|
+          scope_argument_type = type || added_scope.options[:argument_type]
+          if added_scope.options[:type] == :enum
+            enum = graphql_create_enum(name)
+            scope_argument_type = scope_argument_type.is_a?(Array) ? [enum] : enum
+          end
+          add_scope_def_to_filter(added_scope, scope_argument_type)
         end
       end
 
@@ -129,20 +156,18 @@ module Graphiform
         end
       end
 
-      def graphql_field_to_sorting(name)
+      def graphql_field_to_sort(name)
         column_def = column(name)
         association_def = association(name)
 
-        type = ::Enums::Order if column_def.present?
-        if association_def.present? && association_def.klass.graphql_sorting_filter && !association_def.klass.graphql_sorting_filter.arguments.empty?
-          type = association_def.klass.graphql_sorting_filter
-        end
+        type = ::Enums::Sort if column_def.present?
+        type = association_def.klass.graphql_sort if Helpers.association_arguments_valid?(association_def, :graphql_sort)
 
-        return unless type.present?
+        return if type.blank?
 
-        sorting = graphql_sorting_filter
+        local_graphql_sort = graphql_sort
 
-        sorting.class_eval do
+        local_graphql_sort.class_eval do
           argument(
             name,
             type,
@@ -151,11 +176,26 @@ module Graphiform
         end
       end
 
-      def graphql_add_field_to_type(field_name, type, null = nil)
+      def graphql_add_field_to_type(
+        field_name,
+        type,
+        null = nil,
+        description: nil,
+        deprecation_reason: nil,
+        method: nil,
+        read_prepare: nil,
+        **_options
+      )
         field_name = field_name.to_sym
-        field_options = {}
+        field_options = {
+          description: description,
+          deprecation_reason: deprecation_reason,
+          method: method,
+        }
 
-        if resolver?(type)
+        type = Helpers.graphql_type(type)
+
+        if Helpers.resolver?(type)
           field_options[:resolver] = type
         else
           field_options[:type] = type
@@ -163,39 +203,68 @@ module Graphiform
         end
 
         graphql_type.class_eval do
-          field(field_name, **field_options)
+          added_field = field(field_name, **field_options)
+
+          if read_prepare
+            define_method(
+              added_field.method_sym,
+              -> { instance_exec(object.public_send(added_field.method_sym), context, &read_prepare) }
+            )
+          end
         end
       end
 
-      def graphql_add_column_field(field_name, column_def, type: nil, null: nil, **_options)
-        type = Helpers.graphql_type(type || column_def.type)
+      def graphql_add_column_field(field_name, column_def, type: nil, null: nil, **options)
+        is_enum = type.blank? && enum_attribute?(field_name)
+        if is_enum
+          enum = graphql_create_enum(field_name)
+          type = enum
+        end
+        type ||= column_def.type
         null = column_def.null if null.nil?
 
-        graphql_add_field_to_type(field_name, type, null)
+        graphql_add_field_to_type(field_name, type, null, **options)
       end
 
-      def graphql_add_association_field(field_name, association_def, type: nil, null: nil, **_options)
-        raise StandardError, "`#{name}` does not extend ActiveRecord::Graphql" unless association_def.klass.methods.include?(:graphql_type) # TODO: Specialize error
+      def graphql_add_association_field(field_name, association_def, type: nil, null: nil, include_connection: true, read_prepare: nil, **options)
+        unless association_def.klass.respond_to?(:graphql_type)
+          return Helpers.logger.warn(
+            "Graphiform: `#{name}` trying to add association `#{field_name}` - `#{association_def.klass.name}` does not include Graphiform"
+          )
+        end
+
+        if association_def.klass.graphql_type.fields.empty?
+          return Helpers.logger.warn(
+            "Graphiform: `#{name}` trying to add association `#{field_name}` - `#{association_def.klass.name}` has no fields defined"
+          )
+        end
 
         has_many = association_def.macro == :has_many
         klass = association_def.klass
 
-        if has_many
+        if include_connection && has_many
           graphql_add_field_to_type(
             "#{field_name}_connection",
-            klass.graphql_create_resolver(association_def.name, graphql_connection),
-            false
+            klass.graphql_create_resolver(association_def.name, klass.graphql_connection, read_prepare: read_prepare),
+            false,
+            **options
           )
         end
 
-        type = has_many ? klass.graphql_create_resolver(association_def.name, [klass.graphql_type]) : klass.graphql_type if type.nil?
+        if type.nil?
+          type = has_many ? klass.graphql_create_resolver(association_def.name, [klass.graphql_type], read_prepare: read_prepare) : klass.graphql_type
+          read_prepare = nil if has_many
+        end
+
         null = association_def.macro != :has_many if null.nil?
 
-        graphql_add_field_to_type(field_name, type, null)
+        graphql_add_field_to_type(field_name, type, null, read_prepare: read_prepare, **options)
       end
 
-      def graphql_add_method_field(field_name, type:, null: true, **_options)
-        graphql_add_field_to_type(field_name, type, null)
+      def graphql_add_method_field(field_name, type: nil, null: true, **options)
+        return Helpers.logger.warn "Graphiform: Missing `type` for field `#{field_name}` in model `#{name}`" if type.nil?
+
+        graphql_add_field_to_type(field_name, type, null, **options)
       end
     end
   end

@@ -8,6 +8,8 @@ require 'graphiform/fields'
 
 module Graphiform
   def self.included(base)
+    Graphiform.create_skeleton
+
     base.class_eval do
       include Scopiform
 
