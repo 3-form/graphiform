@@ -76,8 +76,24 @@ module Graphiform
         unless defined? @base_resolver
           @base_resolver = Helpers.get_const_or_create(demodulized_name, ::Resolvers) do
             Class.new(::Resolvers::BaseResolver) do
-              # Default resolver just returns the object to prevent exceptions
-              define_method :resolve do |**_args|
+              attr_reader :value
+
+              def resolve(**args)
+                @value = base_resolve(**args)
+                @value = addon_resolve(**args) if respond_to?(:addon_resolve)
+
+                @value
+              end
+
+              def apply_built_ins(where: nil, sort: nil, **)
+                @value = @value.apply_filters(where.to_h) if where.present? && @value.respond_to?(:apply_filters)
+                @value = @value.apply_sorts(sort.to_h) if sort.present? && @value.respond_to?(:apply_sorts)
+
+                @value
+              end
+
+              # Default resolver - meant to be overridden
+              def base_resolve(**)
                 object
               end
             end
@@ -86,7 +102,14 @@ module Graphiform
           local_graphql_filter = graphql_filter
           local_graphql_sort = graphql_sort
 
+          model = self
           @base_resolver.class_eval do
+            unless respond_to?(:model)
+              define_method :model do
+                model
+              end
+            end
+
             argument :where, local_graphql_filter, required: false
             argument :sort, local_graphql_sort, required: false unless local_graphql_sort.arguments.empty?
           end
@@ -97,16 +120,14 @@ module Graphiform
 
       def graphql_query
         Helpers.get_const_or_create(demodulized_name, ::Resolvers::Queries) do
-          model = self
           local_graphql_type = graphql_type
           Class.new(graphql_base_resolver) do
             type local_graphql_type, null: false
 
-            define_method :resolve do |where: nil|
-              val = model.all
-              val = val.apply_filters(where.to_h) if where.present? && val.respond_to?(:apply_filters)
-
-              val.first
+            def base_resolve(**args)
+              @value = model.all
+              apply_built_ins(**args)
+              @value.first
             end
           end
         end
@@ -114,37 +135,29 @@ module Graphiform
 
       def graphql_connection_query
         Helpers.get_const_or_create(demodulized_name, ::Resolvers::ConnectionQueries) do
-          model = self
           connection_type = graphql_connection
           Class.new(graphql_base_resolver) do
             type connection_type, null: false
 
-            define_method :resolve do |where: nil, sort: nil|
-              val = model.all
-              val = val.apply_filters(where.to_h) if where.present? && val.respond_to?(:apply_filters)
-              val = val.apply_sorts(sort.to_h) if sort.present? && val.respond_to?(:apply_sorts)
-
-              val
+            def base_resolve(**args)
+              @value = model.all
+              apply_built_ins(**args)
             end
           end
         end
       end
 
-      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, **_options)
+      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, **)
         Class.new(graphql_base_resolver) do
           type resolver_type, null: false
 
-          define_method :resolve do |where: nil, **args|
-            where_hash = where.to_h
+          define_method :base_resolve do |**args|
+            @value = object
 
-            val = super(**args)
+            @value = @value.public_send(method_name) if @value.respond_to?(method_name)
+            @value = instance_exec(@value, context, &read_prepare) if read_prepare
 
-            val = val.public_send(method_name) if val.respond_to? method_name
-            val = instance_exec(val, context, &read_prepare) if read_prepare
-
-            return val.apply_filters(where_hash) if val.respond_to? :apply_filters
-
-            val
+            apply_built_ins(**args)
           end
         end
       end

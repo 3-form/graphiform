@@ -261,7 +261,7 @@ module Graphiform
         graphql_add_field_to_type(field_name, type, null, read_prepare: read_prepare, **options)
       end
 
-      def graphql_add_method_field(field_name, type:, null: true, **options)
+      def graphql_add_method_field(field_name, type: nil, null: true, **options)
         return Helpers.logger.warn "Graphiform: Missing `type` for field `#{field_name}` in model `#{name}`" if type.nil?
 
         graphql_add_field_to_type(field_name, type, null, **options)
