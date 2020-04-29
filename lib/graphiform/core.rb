@@ -78,9 +78,23 @@ module Graphiform
             Class.new(::Resolvers::BaseResolver) do
               attr_reader :value
 
+              class << self
+                attr_accessor :addon_resolve_blocks
+              end
+
+              def self.addon_resolve(&block)
+                @addon_resolve_blocks ||= []
+                @addon_resolve_blocks << block
+              end
+
               def resolve(**args)
                 @value = base_resolve(**args)
-                @value = addon_resolve(**args) if respond_to?(:addon_resolve)
+
+                if self.class.addon_resolve_blocks.present? && !self.class.addon_resolve_blocks.empty?
+                  self.class.addon_resolve_blocks.each do |addon_resolve_block|
+                    @value = instance_exec(**args, &addon_resolve_block)
+                  end
+                end
 
                 @value
               end

@@ -10,10 +10,8 @@ class GraphqlConnectionQueryAddonResolverTest < ActiveSupport::TestCase
     @second_b = Second.create(first: @first_b, name: 'bailey', number: 8, datetime: '2020-03-16 1:17:20')
     @second_c = Second.create(first: @first_c, name: 'shane', number: 9.5, datetime: '2020-03-16 10:17:20')
 
-    First.graphql_connection_query.class_eval do
-      def addon_resolve(**)
-        value.where.not(name: 'ghi')
-      end
+    First.graphql_connection_query.addon_resolve do |**|
+      value.where.not(name: 'ghi')
     end
 
     query = Class.new(::Types::BaseObject) do
@@ -27,7 +25,7 @@ class GraphqlConnectionQueryAddonResolverTest < ActiveSupport::TestCase
 
   teardown do
     First.graphql_connection_query.class_eval do
-      remove_method :addon_resolve
+      @addon_resolve_blocks = nil
     end
   end
 
