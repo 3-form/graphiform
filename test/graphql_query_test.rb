@@ -72,7 +72,7 @@ class GraphqlQueryTest < ActiveSupport::TestCase
   test 'name starts with query' do
     query = <<-GRAPHQL
       query($name_starts_with: String) {
-        first(where: { name_starts_with: $name_starts_with }) {
+        first(where: { nameStartsWith: $name_starts_with }) {
           id
         }
       }

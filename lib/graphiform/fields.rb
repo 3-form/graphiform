@@ -138,11 +138,10 @@ module Graphiform
         return unless argument_type
 
         argument_type = Helpers.graphql_type(argument_type)
-        camelized_attribute = scope_def.attribute.to_s.camelize(:lower)
+        argument_attribute = scope_def.attribute
         argument_prefix = scope_def.prefix
-        argument_suffix = scope_def.suffix
-        argument_suffix = argument_suffix == '_is' ? '' : argument_suffix
-        argument_name = "#{argument_prefix}#{camelized_attribute}#{argument_suffix}"
+        argument_suffix = scope_def.suffix == '_is' ? '' : scope_def.suffix
+        argument_name = "#{argument_prefix}#{argument_attribute}#{argument_suffix}".underscore
         scope_name = scope_def.name
 
         graphql_filter.class_eval do
@@ -150,7 +149,6 @@ module Graphiform
             argument_name,
             argument_type,
             required: false,
-            camelize: false,
             as: scope_name
           )
         end
