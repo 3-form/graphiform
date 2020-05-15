@@ -6,12 +6,36 @@ class GraphqlQueryTest < ActiveSupport::TestCase
     @first_b = First.create(name: 'def', date: '2020-05-10', number: 10, boolean: false)
     @first_c = First.create(name: 'ghi', date: '2020-04-10', number: 20, boolean: true)
 
+    @second_a = Second.create(first: @first_a, name: 'jayce', number: 10.82, datetime: '2020-03-16 21:17:20')
+    @second_b = Second.create(first: @first_b, name: 'bailey', number: 8, datetime: '2020-03-16 1:17:20')
+    @second_c = Second.create(first: @first_c, name: 'shane', number: 9.5, datetime: '2020-03-16 10:17:20')
+
     query = Class.new(::Types::BaseObject) do
       graphql_name 'test_query'
       field :first, resolver: First.graphql_query
     end
+
+    first_mutation = Class.new(GraphQL::Schema::RelayClassicMutation) do
+      graphql_name 'test_first_mutation'
+
+      argument :attributes, First.graphql_input, required: true
+
+      field :first, First.graphql_type, null: false
+
+      def resolve(**_kargs)
+        { first: First.first }
+      end
+    end
+
+    mutation = Class.new(::Types::BaseObject) do
+      graphql_name 'test_mutation'
+      field :mutateFirst, mutation: first_mutation
+    end
+
+    @first_mutation = first_mutation
     @schema = Class.new(GraphQL::Schema) do
       query(query)
+      mutation(mutation)
     end
   end
 
@@ -99,5 +123,99 @@ class GraphqlQueryTest < ActiveSupport::TestCase
     resp = @schema.execute(query, variables: variables)
 
     assert_equal First.first.id, resp['data']['first']['id']
+  end
+
+  test 'using as resolves to the correct property' do
+    query = <<-GRAPHQL
+      query($id: Int) {
+        first(where: { aliasId: $id }) {
+          id
+          aliasId
+        }
+      }
+    GRAPHQL
+    variables = {
+      id: @first_b.id,
+    }
+
+    resp = @schema.execute(query, variables: variables)
+
+    assert_equal @first_b.id, resp['data']['first']['id']
+    assert_equal @first_b.id, resp['data']['first']['aliasId']
+  end
+
+  test 'using as resolves to the correct association' do
+    query = <<-GRAPHQL
+      query($id: Int) {
+        first(where: { aliasSeconds: { id: $id } }) {
+          id
+          aliasSeconds {
+            id
+          }
+        }
+      }
+    GRAPHQL
+    variables = {
+      id: @second_b.id,
+    }
+
+    resp = @schema.execute(query, variables: variables)
+
+    assert_equal @first_b.id, resp['data']['first']['id']
+    assert_equal @second_b.id, resp['data']['first']['aliasSeconds'].first['id']
+  end
+
+  test 'using as resolves to the correct method' do
+    query = <<-GRAPHQL
+      query($id: Int) {
+        first(where: { aliasId: $id }) {
+          id
+          aliasBasicMethod
+        }
+      }
+    GRAPHQL
+    variables = {
+      id: @first_b.id,
+    }
+
+    resp = @schema.execute(query, variables: variables)
+
+    assert_equal @first_b.id, resp['data']['first']['id']
+    assert_equal @first_b.basic_method, resp['data']['first']['aliasBasicMethod']
+  end
+
+  test 'using as resolves arguments correctly' do
+    resolve_spy = Spy.on_instance_method(@first_mutation, :resolve).and_return({ first: @first_b })
+
+    mutation = <<-GRAPHQL
+      mutation($input: test_first_mutationInput!) {
+        mutateFirst(input: $input) {
+          first {
+            id
+          }
+        }
+      }
+    GRAPHQL
+    variables = {
+      input: {
+        attributes: {
+          aliasId: 55,
+          aliasSecondsAttributes: [ { name: 'derp' } ],
+          aliasBasicMethod: 'hello world',
+        },
+      },
+    }
+
+    resp = @schema.execute(mutation, variables: variables)
+
+    assert_equal @first_b.id, resp['data']['mutateFirst']['first']['id']
+
+    assert_equal 1, resolve_spy.calls.length
+    assert_equal 1, resolve_spy.calls.first.args.length
+    attributes = resolve_spy.calls.first.args.first[:attributes].to_h
+
+    assert_equal 55, attributes[:id]
+    assert_equal 'derp', attributes[:seconds_attributes].first[:name]
+    assert_equal 'hello world', attributes[:basic_method]
   end
 end

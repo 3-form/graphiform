@@ -9,17 +9,18 @@ module Graphiform
     module ClassMethods
       def graphql_readable_field(
         name,
+        as: nil,
         **options
       )
-        column_def = column(name)
-        association_def = association(name)
+        column_def = column(as || name)
+        association_def = association(as || name)
 
-        graphql_add_column_field(name, column_def, **options) if column_def.present?
-        graphql_add_association_field(name, association_def, **options) if association_def.present?
-        graphql_add_method_field(name, **options) unless column_def.present? || association_def.present?
+        graphql_add_column_field(name, column_def, as: as, **options) if column_def.present?
+        graphql_add_association_field(name, association_def, as: as, **options) if association_def.present?
+        graphql_add_method_field(name, as: as, **options) unless column_def.present? || association_def.present?
 
-        graphql_add_scopes_to_filter(name)
-        graphql_field_to_sort(name)
+        graphql_add_scopes_to_filter(name, as || name)
+        graphql_field_to_sort(name, as || name)
       end
 
       def graphql_writable_field(
@@ -31,25 +32,30 @@ module Graphiform
         description: nil,
         default_value: ::GraphQL::Schema::Argument::NO_DEFAULT,
         as: nil,
-        **_options
+        **
       )
         name = name.to_sym
-        argument_name = graphql_resolve_argument_name(name)
-        argument_type = graphql_resolve_argument_type(name, type)
+        has_nested_attributes_method = instance_methods.include?("#{as || name}_attributes=".to_sym)
+
+        argument_name = has_nested_attributes_method ? "#{name}_attributes".to_sym : name
+        argument_type = graphql_resolve_argument_type(as || name, type)
+        as = has_nested_attributes_method ? "#{as}_attributes".to_sym : as.to_sym if as
 
         return Helpers.logger.warn "Graphiform: Missing `type` for argument #{name}" if argument_type.nil?
 
         prepare = write_prepare || prepare
 
         graphql_input.class_eval do
-          argument \
+          argument(
             argument_name,
             argument_type,
             required: required,
             prepare: prepare,
             description: description,
             default_value: default_value,
-            as: as
+            as: as,
+            method_access: false
+          )
         end
       end
 
@@ -84,14 +90,6 @@ module Graphiform
 
       private
 
-      def graphql_resolve_argument_name(name)
-        attributes_name = "#{name}_attributes"
-
-        return attributes_name.to_sym if instance_methods.include?("#{attributes_name}=".to_sym)
-
-        name
-      end
-
       def graphql_resolve_argument_type(name, type)
         type = graphql_create_enum(name) if type.blank? && enum_attribute?(name)
 
@@ -109,12 +107,12 @@ module Graphiform
         has_many ? [association_def.klass.graphql_input] : association_def.klass.graphql_input
       end
 
-      def graphql_add_scopes_to_filter(name)
-        added_scopes = auto_scopes_by_attribute(name)
+      def graphql_add_scopes_to_filter(name, as)
+        added_scopes = auto_scopes_by_attribute(as)
 
         return if added_scopes.empty?
 
-        association_def = association(name)
+        association_def = association(as)
 
         if association_def.present?
           return unless Helpers.association_arguments_valid?(association_def, :graphql_filter)
@@ -130,15 +128,15 @@ module Graphiform
             enum = graphql_create_enum(name)
             scope_argument_type = scope_argument_type.is_a?(Array) ? [enum] : enum
           end
-          add_scope_def_to_filter(added_scope, scope_argument_type)
+          add_scope_def_to_filter(name, added_scope, scope_argument_type)
         end
       end
 
-      def add_scope_def_to_filter(scope_def, argument_type)
+      def add_scope_def_to_filter(name, scope_def, argument_type)
         return unless argument_type
 
         argument_type = Helpers.graphql_type(argument_type)
-        argument_attribute = scope_def.attribute
+        argument_attribute = name
         argument_prefix = scope_def.prefix
         argument_suffix = scope_def.suffix == '_is' ? '' : scope_def.suffix
         argument_name = "#{argument_prefix}#{argument_attribute}#{argument_suffix}".underscore
@@ -149,14 +147,15 @@ module Graphiform
             argument_name,
             argument_type,
             required: false,
-            as: scope_name
+            as: scope_name,
+            method_access: false
           )
         end
       end
 
-      def graphql_field_to_sort(name)
-        column_def = column(name)
-        association_def = association(name)
+      def graphql_field_to_sort(name, as)
+        column_def = column(as || name)
+        association_def = association(as || name)
 
         type = ::Enums::Sort if column_def.present?
         type = association_def.klass.graphql_sort if Helpers.association_arguments_valid?(association_def, :graphql_sort)
@@ -169,7 +168,9 @@ module Graphiform
           argument(
             name,
             type,
-            required: false
+            required: false,
+            as: as,
+            method_access: false
           )
         end
       end
@@ -181,17 +182,19 @@ module Graphiform
         description: nil,
         deprecation_reason: nil,
         method: nil,
+        as: nil,
         read_prepare: nil,
-        **_options
+        **
       )
+        type = Helpers.graphql_type(type)
+        is_resolver = Helpers.resolver?(type)
+
         field_name = field_name.to_sym
         field_options = {
           description: description,
           deprecation_reason: deprecation_reason,
-          method: method,
+          method: is_resolver ? nil : method || as,
         }
-
-        type = Helpers.graphql_type(type)
 
         if Helpers.resolver?(type)
           field_options[:resolver] = type
@@ -212,16 +215,16 @@ module Graphiform
         end
       end
 
-      def graphql_add_column_field(field_name, column_def, type: nil, null: nil, **options)
-        is_enum = type.blank? && enum_attribute?(field_name)
+      def graphql_add_column_field(field_name, column_def, type: nil, null: nil, as: nil, **options)
+        is_enum = type.blank? && enum_attribute?(as || field_name)
         if is_enum
-          enum = graphql_create_enum(field_name)
+          enum = graphql_create_enum(as || field_name)
           type = enum
         end
         type ||= column_def.type
         null = column_def.null if null.nil?
 
-        graphql_add_field_to_type(field_name, type, null, **options)
+        graphql_add_field_to_type(field_name, type, null, as: as, **options)
       end
 
       def graphql_add_association_field(field_name, association_def, type: nil, null: nil, include_connection: true, read_prepare: nil, **options)
