@@ -75,7 +75,7 @@ class EnumsTest < ActiveSupport::TestCase
   test 'basic filtering by enum works' do
     query = <<-GRAPHQL
       query($statuses: [ThirdStatuses!]) {
-        thirdConnection(where: { status_in: $statuses }) {
+        thirdConnection(where: { statusIn: $statuses }) {
           nodes {
             id
           }

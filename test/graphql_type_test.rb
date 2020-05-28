@@ -7,8 +7,6 @@ class GraphqlTypeTest < ActiveSupport::TestCase
   end
 
   test 'has correct type for each graphql_type field' do
-    assert_equal 9, First.graphql_type.fields.count
-
     assert_equal GraphQL::Types::String, First.graphql_type.fields['name'].type
     assert_equal GraphQL::Types::ISO8601Date, First.graphql_type.fields['date'].type
     assert_equal GraphQL::Types::Int, First.graphql_type.fields['number'].type

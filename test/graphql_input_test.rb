@@ -7,7 +7,7 @@ class GraphqlInputTest < ActiveSupport::TestCase
   end
 
   test 'has correct argument for each graphql_input field' do
-    assert_equal 5, First.graphql_input.arguments.count
+    assert_equal 8, First.graphql_input.arguments.count
 
     assert_equal GraphQL::Types::String, First.graphql_input.arguments['name'].type
     assert_equal GraphQL::Types::ISO8601Date, First.graphql_input.arguments['date'].type
