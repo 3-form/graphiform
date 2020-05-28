@@ -161,14 +161,15 @@ module Graphiform
         end
       end
 
-      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, **)
+      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, **)
         Class.new(graphql_base_resolver) do
           type resolver_type, null: false
 
           define_method :base_resolve do |**args|
             @value = object
 
-            @value = @value.public_send(method_name) if @value.respond_to?(method_name)
+            @value = instance_exec(@value, context, &read_resolve) if read_resolve
+            @value = @value.public_send(method_name) if !read_resolve && @value.respond_to?(method_name)
             @value = instance_exec(@value, context, &read_prepare) if read_prepare
 
             apply_built_ins(**args)
