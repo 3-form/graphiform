@@ -212,7 +212,9 @@ module Graphiform
               added_field.method_sym,
               lambda do
                 value = read_resolve ? instance_exec(object, context, &read_resolve) : object.public_send(added_field.method_sym)
-                instance_exec(value, context, &read_prepare) if read_prepare
+                value = instance_exec(value, context, &read_prepare) if read_prepare
+
+                value
               end
             )
           end
