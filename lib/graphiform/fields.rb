@@ -41,7 +41,7 @@ module Graphiform
         argument_type = graphql_resolve_argument_type(as || name, type)
         as = has_nested_attributes_method ? "#{as}_attributes".to_sym : as.to_sym if as
 
-        return Helpers.logger.warn "Graphiform: Missing `type` for argument #{name}" if argument_type.nil?
+        return Helpers.logger.warn "Graphiform: Missing `type` for argument `#{name}` in model `#{self.name}`" if argument_type.nil?
 
         prepare = write_prepare || prepare
 
