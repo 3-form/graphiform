@@ -136,7 +136,7 @@ module Graphiform
         Helpers.get_const_or_create(demodulized_name, ::Resolvers::Queries) do
           local_graphql_type = graphql_type
           Class.new(graphql_base_resolver) do
-            type local_graphql_type, null: false
+            type local_graphql_type, null: true
 
             def base_resolve(**args)
               @value = model.all
@@ -161,9 +161,9 @@ module Graphiform
         end
       end
 
-      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, **)
+      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, null: true, **)
         Class.new(graphql_base_resolver) do
-          type resolver_type, null: false
+          type resolver_type, null: null
 
           define_method :base_resolve do |**args|
             @value = object

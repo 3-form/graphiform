@@ -265,7 +265,8 @@ module Graphiform
               association_def.name,
               klass.graphql_connection,
               read_prepare: read_prepare,
-              read_resolve: read_resolve
+              read_resolve: read_resolve,
+              null: false
             ),
             false,
             **options
@@ -279,7 +280,8 @@ module Graphiform
                 association_def.name,
                 [klass.graphql_type],
                 read_prepare: read_prepare,
-                read_resolve: read_resolve
+                read_resolve: read_resolve,
+                null: false
               )
             else
               klass.graphql_type
