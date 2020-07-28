@@ -43,7 +43,7 @@ class GraphqlQueryTest < ActiveSupport::TestCase
     assert_respond_to First, :graphql_query
     assert_not_empty First.graphql_query.arguments
 
-    assert_equal First.graphql_type, First.graphql_query.type.of_type
+    assert_equal First.graphql_type, First.graphql_query.type
 
     assert First.graphql_query.arguments['where']
     assert_equal First.graphql_filter, First.graphql_query.arguments['where'].type
@@ -90,7 +90,7 @@ class GraphqlQueryTest < ActiveSupport::TestCase
 
     resp = @schema.execute(query, variables: variables)
 
-    assert_nil resp['data']
+    assert_nil resp['data']['first']
   end
 
   test 'name starts with query' do
