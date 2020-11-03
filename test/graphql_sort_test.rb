@@ -13,6 +13,6 @@ class GraphqlSortTest < ActiveSupport::TestCase
   test 'has correct type for each graphql_sort argument' do
     assert_equal 10, First.graphql_sort.arguments.count
 
-    assert_equal ::Enums::Sort, First.graphql_sort.arguments['name'].type
+    assert_equal ::Graphiform::SortEnum, First.graphql_sort.arguments['name'].type
   end
 end

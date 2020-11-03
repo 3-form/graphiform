@@ -80,12 +80,5 @@ module Graphiform
     Helpers.get_const_or_create('BaseEnum', ::Enums) do
       Class.new(::GraphQL::Schema::Enum)
     end
-
-    Helpers.get_const_or_create('Sort', ::Enums) do
-      Class.new(::Enums::BaseEnum) do
-        value 'ASC', 'Sort results in ascending order'
-        value 'DESC', 'Sort results in descending order'
-      end
-    end
   end
 end
