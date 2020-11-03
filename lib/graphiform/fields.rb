@@ -157,7 +157,7 @@ module Graphiform
         column_def = column(as || name)
         association_def = association(as || name)
 
-        type = ::Enums::Sort if column_def.present?
+        type = ::Graphiform::SortEnum if column_def.present?
         type = association_def.klass.graphql_sort if Helpers.association_arguments_valid?(association_def, :graphql_sort)
 
         return if type.blank?

@@ -5,6 +5,7 @@ require 'graphiform/skeleton'
 require 'graphiform/active_record_helpers'
 require 'graphiform/core'
 require 'graphiform/fields'
+require 'graphiform/sort_enum'
 
 module Graphiform
   def self.included(base)
