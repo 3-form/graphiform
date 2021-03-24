@@ -21,6 +21,7 @@ module Graphiform
 
         graphql_add_scopes_to_filter(name, as || name)
         graphql_field_to_sort(name, as || name)
+        graphql_field_to_grouping(name, as || name)
       end
 
       def graphql_writable_field(
@@ -120,9 +121,11 @@ module Graphiform
           type = association_def.klass.graphql_filter
         end
 
-        non_sort_by_scopes = added_scopes.select { |scope_def| !scope_def.options || scope_def.options[:type] != :sort }
+        filter_only_by_scopes = added_scopes.select do |scope_def|
+          !scope_def.options || scope_def.options[:type].blank? || scope_def.options[:type] == :enum
+        end
 
-        non_sort_by_scopes.each do |added_scope|
+        filter_only_by_scopes.each do |added_scope|
           scope_argument_type = type || added_scope.options[:argument_type]
           if added_scope.options[:type] == :enum
             enum = graphql_create_enum(name)
@@ -165,6 +168,28 @@ module Graphiform
         local_graphql_sort = graphql_sort
 
         local_graphql_sort.class_eval do
+          argument(
+            name,
+            type,
+            required: false,
+            as: as,
+            method_access: false
+          )
+        end
+      end
+
+      def graphql_field_to_grouping(name, as)
+        column_def = column(as || name)
+        association_def = association(as || name)
+
+        type = GraphQL::Types::Boolean if column_def.present?
+        type = association_def.klass.graphql_grouping if Helpers.association_arguments_valid?(association_def, :graphql_grouping)
+
+        return if type.blank?
+
+        local_graphql_grouping = graphql_grouping
+
+        local_graphql_grouping.class_eval do
           argument(
             name,
             type,

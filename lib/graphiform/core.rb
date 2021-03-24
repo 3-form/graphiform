@@ -52,6 +52,15 @@ module Graphiform
         end
       end
 
+      def graphql_grouping
+        local_demodulized_name = demodulized_name
+        Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Groupings) do
+          Class.new(::Inputs::Groupings::BaseGrouping) do
+            graphql_name "#{local_demodulized_name}Grouping"
+          end
+        end
+      end
+
       def graphql_edge
         Helpers.get_const_or_create("#{demodulized_name}Edge", ::Types) do
           node_type = graphql_type
@@ -99,9 +108,10 @@ module Graphiform
                 @value
               end
 
-              def apply_built_ins(where: nil, sort: nil, **)
+              def apply_built_ins(where: nil, sort: nil, group: nil, **)
                 @value = @value.apply_filters(where.to_h) if where.present? && @value.respond_to?(:apply_filters)
                 @value = @value.apply_sorts(sort.to_h) if sort.present? && @value.respond_to?(:apply_sorts)
+                @value = @value.apply_groupings(group.to_h) if group.present? && @value.respond_to?(:apply_groupings)
 
                 @value
               end
@@ -115,6 +125,7 @@ module Graphiform
 
           local_graphql_filter = graphql_filter
           local_graphql_sort = graphql_sort
+          local_graphql_grouping = graphql_grouping
 
           model = self
           @base_resolver.class_eval do
@@ -126,6 +137,7 @@ module Graphiform
 
             argument :where, local_graphql_filter, required: false
             argument :sort, local_graphql_sort, required: false unless local_graphql_sort.arguments.empty?
+            argument :group, local_graphql_grouping, required: false unless local_graphql_grouping.arguments.empty?
           end
         end
 

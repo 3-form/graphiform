@@ -45,6 +45,14 @@ module Graphiform
       Class.new(::GraphQL::Schema::InputObject)
     end
 
+    Helpers.get_const_or_create('Groupings', ::Inputs) do
+      Module.new
+    end
+
+    Helpers.get_const_or_create('BaseGrouping', ::Inputs::Groupings) do
+      Class.new(::GraphQL::Schema::InputObject)
+    end
+
     # Resolvers
     Helpers.get_const_or_create('Resolvers') do
       Module.new
