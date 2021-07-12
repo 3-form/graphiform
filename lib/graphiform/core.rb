@@ -3,6 +3,7 @@
 require 'active_support/concern'
 
 require 'graphiform/helpers'
+require 'graphiform/association_loader'
 
 module Graphiform
   module Core
@@ -180,11 +181,32 @@ module Graphiform
           define_method :base_resolve do |**args|
             @value = object
 
-            @value = instance_exec(@value, context, &read_resolve) if read_resolve
-            @value = @value.public_send(method_name) if !read_resolve && @value.respond_to?(method_name)
-            @value = instance_exec(@value, context, &read_prepare) if read_prepare
+            # association_def = @value.association(method_name)&.reflection
 
-            apply_built_ins(**args)
+            # if !association_def || read_resolve || read_prepare || args[:group]
+              @value = instance_exec(@value, context, &read_resolve) if read_resolve
+              @value = @value.public_send(method_name) if !read_resolve && @value.respond_to?(method_name)
+              @value = instance_exec(@value, context, &read_prepare) if read_prepare
+
+              apply_built_ins(**args)
+            # else
+            #   join_keys = association_def.join_keys
+            #   puts "Loacing #{association_def.klass} - #{join_keys.key} - #{join_keys.foreign_key}"
+            #   AssociationLoader.for(association_def.klass, join_keys.key, **args).load(@value.public_send(join_keys.foreign_key))
+            # end
+          end
+        end
+      end
+
+      def graphql_create_association_resolver(association_def, resolver_type, null: true, **)
+        Class.new(::Resolvers::BaseResolver) do
+          type resolver_type, null: null
+
+          define_method :resolve do |**args|
+            value = object
+
+            join_keys = association_def.join_keys
+            AssociationLoader.for(association_def.klass, join_keys.key, where: args[:where], sort: args[:sort]).load(value.public_send(join_keys.foreign_key))
           end
         end
       end

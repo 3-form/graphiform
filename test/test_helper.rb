@@ -22,6 +22,8 @@ require 'spy'
 # to be shown.
 Minitest.backtrace_filter = Minitest::BacktraceFilter.new
 
+# ActiveRecord::Base.logger = Logger.new(STDOUT)
+
 # require 'rails/test_unit/reporter'
 # Rails::TestUnitReporter.executable = 'bin/test'
 
