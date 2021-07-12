@@ -5,7 +5,7 @@ module Graphiform
     def self.logger
       return Rails.logger if Rails.logger.present?
 
-      @logger ||= Logger.new(STDOUT)
+      @logger ||= Logger.new($stdout)
       @logger
     end
 
@@ -32,6 +32,8 @@ module Graphiform
         GraphQL::Types::Float
       when :boolean
         GraphQL::Types::Boolean
+      when :json, :jsonb
+        GraphQL::Types::JSON
       else
         active_record_type
       end
