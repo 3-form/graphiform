@@ -19,3 +19,5 @@ gem 'rails', '>= 4.2.7'
 gem 'byebug', group: [:development, :test]
 
 gem 'sqlite3', '~> 1.4'
+
+gem 'graphql-batch', '~> 0.4.3'

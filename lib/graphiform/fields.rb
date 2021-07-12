@@ -309,7 +309,11 @@ module Graphiform
                 null: false
               )
             else
-              klass.graphql_type
+              klass.graphql_create_association_resolver(
+                association_def,
+                klass.graphql_type
+              )
+              # klass.graphql_type
             end
           )
 
