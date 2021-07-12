@@ -37,6 +37,7 @@ module Graphiform
           end
           @filter.class_eval do
             argument 'OR', [self], required: false
+            argument 'AND', [self], required: false
           end
         end
 
@@ -153,7 +154,7 @@ module Graphiform
             def base_resolve(**args)
               @value = model.all
               apply_built_ins(**args)
-              @value.first
+              @value.take
             end
           end
         end
