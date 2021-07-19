@@ -12,16 +12,17 @@ module Graphiform
         as: nil,
         **options
       )
-        column_def = column(as || name)
-        association_def = association(as || name)
+        identifier = as || name
+        column_def = column(identifier)
+        association_def = association(identifier)
 
         graphql_add_column_field(name, column_def, as: as, **options) if column_def.present?
         graphql_add_association_field(name, association_def, as: as, **options) if association_def.present?
         graphql_add_method_field(name, as: as, **options) unless column_def.present? || association_def.present?
 
-        graphql_add_scopes_to_filter(name, as || name)
-        graphql_field_to_sort(name, as || name)
-        graphql_field_to_grouping(name, as || name)
+        graphql_add_scopes_to_filter(name, identifier)
+        graphql_field_to_sort(name, identifier)
+        graphql_field_to_grouping(name, identifier)
       end
 
       def graphql_writable_field(
@@ -266,6 +267,8 @@ module Graphiform
         include_connection: true,
         read_prepare: nil,
         read_resolve: nil,
+        skip_dataloader: false,
+        case_sensitive: Graphiform.configuration[:case_sensitive],
         **options
       )
         unless association_def.klass.respond_to?(:graphql_type)
@@ -291,7 +294,9 @@ module Graphiform
               klass.graphql_connection,
               read_prepare: read_prepare,
               read_resolve: read_resolve,
-              null: false
+              null: false,
+              skip_dataloader: true,
+              case_sensitive: case_sensitive
             ),
             false,
             **options
@@ -306,10 +311,17 @@ module Graphiform
                 [klass.graphql_type],
                 read_prepare: read_prepare,
                 read_resolve: read_resolve,
-                null: false
+                null: false,
+                skip_dataloader: skip_dataloader,
+                case_sensitive: case_sensitive
               )
             else
-              klass.graphql_type
+              klass.graphql_create_association_resolver(
+                association_def,
+                klass.graphql_type,
+                skip_dataloader: skip_dataloader,
+                case_sensitive: case_sensitive
+              )
             end
           )
 

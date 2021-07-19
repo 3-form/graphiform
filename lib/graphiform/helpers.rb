@@ -72,5 +72,15 @@ module Graphiform
         association_def.klass.send(method).respond_to?(:arguments) &&
         !association_def.klass.send(method).arguments.empty?
     end
+
+    def self.dataloader_support?(dataloader, association_def, keys)
+      (
+        association_def.present? &&
+        !association_def.polymorphic? &&
+        !association_def.through_reflection? &&
+        !keys.is_a?(Array) &&
+        !dataloader.is_a?(GraphQL::Dataloader::NullDataloader)
+      )
+    end
   end
 end

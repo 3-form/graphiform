@@ -3,6 +3,7 @@
 require 'active_support/concern'
 
 require 'graphiform/helpers'
+require 'graphiform/association_source'
 
 module Graphiform
   module Core
@@ -174,18 +175,61 @@ module Graphiform
         end
       end
 
-      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, null: true, **)
+      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, null: true, skip_dataloader: false, case_sensitive: Graphiform.configuration[:case_sensitive], **)
         Class.new(graphql_base_resolver) do
           type resolver_type, null: null
 
           define_method :base_resolve do |**args|
             @value = object
 
-            @value = instance_exec(@value, context, &read_resolve) if read_resolve
-            @value = @value.public_send(method_name) if !read_resolve && @value.respond_to?(method_name)
-            @value = instance_exec(@value, context, &read_prepare) if read_prepare
+            association_def = @value.association(method_name)&.reflection
+            join_keys = association_def&.join_keys
 
-            apply_built_ins(**args)
+            skip_dataloader ||=
+              !association_def ||
+              !Helpers.dataloader_support?(dataloader, association_def, join_keys.foreign_key) ||
+              read_resolve ||
+              read_prepare ||
+              args[:group]
+
+            if skip_dataloader
+              @value = instance_exec(@value, context, &read_resolve) if read_resolve
+              @value = @value.public_send(method_name) if !read_resolve && @value.respond_to?(method_name)
+              @value = instance_exec(@value, context, &read_prepare) if read_prepare
+
+              apply_built_ins(**args)
+            else
+              dataloader
+                .with(
+                  AssociationSource,
+                  association_def.klass,
+                  join_keys.key,
+                  where: args[:where],
+                  sort: args[:sort],
+                  multi: true,
+                  case_sensitive: case_sensitive,
+                )
+                .load(
+                  @value.public_send(join_keys.foreign_key)
+                )
+            end
+          end
+        end
+      end
+
+      def graphql_create_association_resolver(association_def, resolver_type, null: true, skip_dataloader: false, case_sensitive: nil, **)
+        Class.new(::Resolvers::BaseResolver) do
+          type resolver_type, null: null
+
+          define_method :resolve do |*|
+            join_keys = association_def.join_keys
+
+            skip_dataloader ||= !Helpers.dataloader_support?(dataloader, association_def, join_keys.foreign_key)
+
+            return object.public_send(association_def.name) if skip_dataloader
+
+            value = object.public_send(join_keys.foreign_key)
+            dataloader.with(AssociationSource, association_def.klass, join_keys.key, case_sensitive: case_sensitive).load(value)
           end
         end
       end

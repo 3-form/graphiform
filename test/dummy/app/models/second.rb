@@ -9,21 +9,27 @@ class Second < ApplicationRecord
     write_prepare: proc { |value| value.reverse },
   }
 
-  graphql_fields \
+  graphql_fields(
     :id,
     :name,
     :datetime,
     :number,
     # config
-    writable: true
+    writable: true,
+  )
 
-  graphql_field \
+  graphql_fields(
+    :first
+  )
+
+  graphql_field(
     :translate_this,
     # config
     type: :string,
     null: false,
     writable: true,
-    **translate_this_preparers
+    **translate_this_preparers,
+  )
 
   def translate_this
     "#{id}:#{name}"

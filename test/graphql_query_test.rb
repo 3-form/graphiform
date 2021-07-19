@@ -13,6 +13,8 @@ class GraphqlQueryTest < ActiveSupport::TestCase
     query = Class.new(::Types::BaseObject) do
       graphql_name 'test_query'
       field :first, resolver: First.graphql_query
+      field :second, resolver: Second.graphql_query
+      field :seconds, resolver: Second.graphql_connection_query
     end
 
     first_mutation = Class.new(GraphQL::Schema::RelayClassicMutation) do
@@ -34,6 +36,8 @@ class GraphqlQueryTest < ActiveSupport::TestCase
 
     @first_mutation = first_mutation
     @schema = Class.new(GraphQL::Schema) do
+      use(GraphQL::Dataloader)
+
       query(query)
       mutation(mutation)
     end
@@ -74,6 +78,32 @@ class GraphqlQueryTest < ActiveSupport::TestCase
     assert_equal @first_b.date.iso8601, resp['data']['first']['date']
     assert_equal @first_b.number, resp['data']['first']['number']
     assert_equal @first_b.boolean, resp['data']['first']['boolean']
+  end
+
+  test 'load belongs_to association batch loading' do
+    query = <<-GRAPHQL
+      query {
+        seconds {
+          nodes {
+            id
+            first {
+              id
+            }
+          }
+        }
+      }
+    GRAPHQL
+    variables = {}
+
+    resp = @schema.execute(query, variables: variables)
+
+    nodes = resp['data']['seconds']['nodes']
+
+    assert_equal Second.count, nodes.count
+
+    resp_b = nodes.find { |node| node['id'] == @second_b.id }
+
+    assert_equal @first_b.id, resp_b['first']['id']
   end
 
   test 'no results query' do

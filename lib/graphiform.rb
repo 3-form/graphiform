@@ -19,4 +19,12 @@ module Graphiform
       include Graphiform::Fields
     end
   end
+
+  def self.configuration
+    @configuration ||= {}
+  end
+
+  def self.configure
+    yield(configuration)
+  end
 end
