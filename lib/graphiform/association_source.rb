@@ -17,7 +17,9 @@ module Graphiform
     end
 
     def query(values)
-      query = @model.where(@attribute => values)
+      query = @model
+      query = query.merge(@model.instance_exec(&@options[:scope])) if @options[:scope].present?
+      query = query.where(@attribute => values)
 
       query = query.includes(@options[:includes]) if @options[:includes].present? && query.respond_to?(:includes)
       query = query.apply_filters(@options[:where].to_h) if @options[:where].present? && query.respond_to?(:apply_filters)

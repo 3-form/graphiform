@@ -204,6 +204,7 @@ module Graphiform
                   AssociationSource,
                   association_def.klass,
                   join_keys.key,
+                  scope: association_def.scope,
                   where: args[:where],
                   sort: args[:sort],
                   multi: true,
@@ -229,7 +230,7 @@ module Graphiform
             return object.public_send(association_def.name) if skip_dataloader
 
             value = object.public_send(join_keys.foreign_key)
-            dataloader.with(AssociationSource, association_def.klass, join_keys.key, case_sensitive: case_sensitive).load(value)
+            dataloader.with(AssociationSource, association_def.klass, join_keys.key, scope: association_def.scope, case_sensitive: case_sensitive).load(value)
           end
         end
       end

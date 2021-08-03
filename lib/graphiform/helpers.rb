@@ -19,24 +19,7 @@ module Graphiform
     def self.graphql_type_single(active_record_type)
       return active_record_type unless active_record_type.respond_to?(:to_sym)
 
-      case active_record_type.to_sym
-      when :string, :text
-        GraphQL::Types::String
-      when :date
-        GraphQL::Types::ISO8601Date
-      when :time, :datetime, :timestamp
-        GraphQL::Types::ISO8601DateTime
-      when :integer
-        GraphQL::Types::Int
-      when :float, :decimal
-        GraphQL::Types::Float
-      when :boolean
-        GraphQL::Types::Boolean
-      when :json, :jsonb
-        GraphQL::Types::JSON
-      else
-        active_record_type
-      end
+      Graphiform.configuration[:scalar_mappings][active_record_type.to_sym] || active_record_type
     end
 
     def self.resolver?(val)
@@ -78,6 +61,10 @@ module Graphiform
         association_def.present? &&
         !association_def.polymorphic? &&
         !association_def.through_reflection? &&
+        (
+          !association_def.scope ||
+          association_def.scope.arity.zero?
+        ) &&
         !keys.is_a?(Array) &&
         !dataloader.is_a?(GraphQL::Dataloader::NullDataloader)
       )

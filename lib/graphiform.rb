@@ -21,7 +21,29 @@ module Graphiform
   end
 
   def self.configuration
-    @configuration ||= {}
+    @configuration ||= {
+      scalar_mappings: {
+        string: GraphQL::Types::String,
+        text: GraphQL::Types::String,
+        # nchar: GraphQL::Types::String,
+
+        date: GraphQL::Types::ISO8601Date,
+
+        time: GraphQL::Types::ISO8601DateTime,
+        datetime: GraphQL::Types::ISO8601DateTime,
+        timestamp: GraphQL::Types::ISO8601DateTime,
+
+        integer: GraphQL::Types::Int,
+
+        float: GraphQL::Types::Float,
+        decimal: GraphQL::Types::Float,
+
+        boolean: GraphQL::Types::Boolean,
+
+        json: GraphQL::Types::JSON,
+        jsonb: GraphQL::Types::JSON,
+      },
+    }
   end
 
   def self.configure
