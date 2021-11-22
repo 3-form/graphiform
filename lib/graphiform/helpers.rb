@@ -61,6 +61,7 @@ module Graphiform
         association_def.present? &&
         !association_def.polymorphic? &&
         !association_def.through_reflection? &&
+        !association_def.inverse_of&.polymorphic? &&
         (
           !association_def.scope ||
           association_def.scope.arity.zero?
