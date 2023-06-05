@@ -26,6 +26,7 @@ module Graphiform
         string: GraphQL::Types::String,
         text: GraphQL::Types::String,
         # nchar: GraphQL::Types::String,
+        varchar: GraphQL::Types::String,
 
         date: GraphQL::Types::ISO8601Date,
 
