@@ -8,10 +8,6 @@ require 'graphiform/fields'
 require 'graphiform/sort_enum'
 
 module Graphiform
-  class << self
-    attr_reader(:skeleton_created)
-  end
-
   def self.included(base)
     Graphiform.create_skeleton
 

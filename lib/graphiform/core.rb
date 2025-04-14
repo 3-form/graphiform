@@ -183,11 +183,10 @@ module Graphiform
             @value = object
 
             association_def = @value.association(method_name)&.reflection
-            join_keys = association_def&.join_keys
 
             skip_dataloader ||=
               !association_def ||
-              !Helpers.dataloader_support?(dataloader, association_def, join_keys.foreign_key) ||
+              !Helpers.dataloader_support?(dataloader, association_def, association_def.join_foreign_key) ||
               read_resolve ||
               read_prepare ||
               args[:group]
@@ -203,7 +202,7 @@ module Graphiform
                 .with(
                   AssociationSource,
                   association_def.klass,
-                  join_keys.key,
+                  association_def.join_primary_key,
                   scope: association_def.scope,
                   where: args[:where],
                   sort: args[:sort],
@@ -211,7 +210,7 @@ module Graphiform
                   case_sensitive: case_sensitive,
                 )
                 .load(
-                  @value.public_send(join_keys.foreign_key)
+                  @value.public_send(association_def.join_foreign_key)
                 )
             end
           end
@@ -223,14 +222,13 @@ module Graphiform
           type resolver_type, null: null
 
           define_method :resolve do |*|
-            join_keys = association_def.join_keys
 
-            skip_dataloader ||= !Helpers.dataloader_support?(dataloader, association_def, join_keys.foreign_key)
+            skip_dataloader ||= !Helpers.dataloader_support?(dataloader, association_def, association_def.join_foreign_key)
 
             return object.public_send(association_def.name) if skip_dataloader
 
-            value = object.public_send(join_keys.foreign_key)
-            dataloader.with(AssociationSource, association_def.klass, join_keys.key, scope: association_def.scope, case_sensitive: case_sensitive).load(value)
+            value = object.public_send(association_def.join_foreign_key)
+            dataloader.with(AssociationSource, association_def.klass, association_def.join_primary_key, scope: association_def.scope, case_sensitive: case_sensitive).load(value)
           end
         end
       end
