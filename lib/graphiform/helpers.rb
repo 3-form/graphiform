@@ -42,6 +42,10 @@ module Graphiform
       val
     end
 
+    def self.equal_graphql_names?(key, name)
+      key.downcase == name.to_s.camelize.downcase || key.downcase == name.to_s.downcase
+    end
+
     def self.full_const_name(name)
       name = "Object#{name}" if name.starts_with?('::')
       name = "Object::#{name}" unless name.starts_with?('Object::')

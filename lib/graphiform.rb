@@ -6,6 +6,7 @@ require 'graphiform/active_record_helpers'
 require 'graphiform/core'
 require 'graphiform/fields'
 require 'graphiform/sort_enum'
+class GraphiformConfigurationError < StandardError; end
 
 module Graphiform
   def self.included(base)
@@ -49,5 +50,10 @@ module Graphiform
 
   def self.configure
     yield(configuration)
+    if configuration[:field_class].present? && configuration[:argument_class].blank?
+      raise GraphiformConfigurationError, 'If field_class is provided an argument class must also be provided'
+    elsif configuration[:field_class].blank? && configuration[:argument_class].present?
+      raise GraphiformConfigurationError, 'If argument_class is provided a field_class must also be provided'
+    end
   end
 end

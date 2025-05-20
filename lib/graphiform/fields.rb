@@ -10,19 +10,21 @@ module Graphiform
       def graphql_readable_field(
         name,
         as: nil,
+        read_prepare: nil,
+        null: nil,
         **options
       )
         identifier = as || name
         column_def = column(identifier)
         association_def = association(identifier)
 
-        graphql_add_column_field(name, column_def, as: as, **options) if column_def.present?
-        graphql_add_association_field(name, association_def, as: as, **options) if association_def.present?
-        graphql_add_method_field(name, as: as, **options) unless column_def.present? || association_def.present?
+        graphql_add_column_field(name, column_def, read_prepare: read_prepare, null: null, as: as, **options) if column_def.present?
+        graphql_add_association_field(name, association_def, read_prepare: read_prepare, null: null, as: as, **options) if association_def.present?
+        graphql_add_method_field(name, read_prepare: read_prepare, null: null, as: as, **options) unless column_def.present? || association_def.present?
 
-        graphql_add_scopes_to_filter(name, identifier)
-        graphql_field_to_sort(name, identifier)
-        graphql_field_to_grouping(name, identifier)
+        graphql_add_scopes_to_filter(name, identifier, **options)
+        graphql_field_to_sort(name, identifier, **options)
+        graphql_field_to_grouping(name, identifier, **options)
       end
 
       def graphql_writable_field(
@@ -34,7 +36,7 @@ module Graphiform
         description: nil,
         default_value: ::GraphQL::Schema::Argument::NO_DEFAULT,
         as: nil,
-        **
+        **args
       )
         name = name.to_sym
         has_nested_attributes_method = instance_methods.include?("#{as || name}_attributes=".to_sym)
@@ -56,9 +58,10 @@ module Graphiform
             description: description,
             default_value: default_value,
             as: as,
-            method_access: false
+            method_access: false,
+            **args
           )
-        end
+        end unless graphql_input.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
       end
 
       def graphql_field(
@@ -66,10 +69,13 @@ module Graphiform
         write_name: nil,
         readable: true,
         writable: false,
+        read_prepare: nil,
+        write_prepare: nil,
+        null: nil,
         **options
       )
-        graphql_readable_field(name, **options) if readable
-        graphql_writable_field(write_name || name, **options) if writable
+        graphql_readable_field(name, read_prepare: read_prepare, null: null, **options) if readable
+        graphql_writable_field(write_name || name, write_prepare: write_prepare, **options) if writable
       end
 
       def graphql_fields(*names, **options)
@@ -109,7 +115,7 @@ module Graphiform
         has_many ? [association_def.klass.graphql_input] : association_def.klass.graphql_input
       end
 
-      def graphql_add_scopes_to_filter(name, as)
+      def graphql_add_scopes_to_filter(name, as, **options)
         added_scopes = auto_scopes_by_attribute(as)
 
         return if added_scopes.empty?
@@ -132,11 +138,11 @@ module Graphiform
             enum = graphql_create_enum(name)
             scope_argument_type = scope_argument_type.is_a?(Array) ? [enum] : enum
           end
-          add_scope_def_to_filter(name, added_scope, scope_argument_type)
+          add_scope_def_to_filter(name, added_scope, scope_argument_type, **options)
         end
       end
 
-      def add_scope_def_to_filter(name, scope_def, argument_type)
+      def add_scope_def_to_filter(name, scope_def, argument_type, **options)
         return unless argument_type
 
         argument_type = Helpers.graphql_type(argument_type)
@@ -152,12 +158,13 @@ module Graphiform
             argument_type,
             required: false,
             as: scope_name,
-            method_access: false
+            method_access: false,
+            **options
           )
-        end
+        end unless graphql_filter.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
       end
 
-      def graphql_field_to_sort(name, as)
+      def graphql_field_to_sort(name, as, **options)
         column_def = column(as || name)
         association_def = association(as || name)
 
@@ -174,12 +181,13 @@ module Graphiform
             type,
             required: false,
             as: as,
-            method_access: false
+            method_access: false,
+            **options
           )
-        end
+        end unless local_graphql_sort.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
       end
 
-      def graphql_field_to_grouping(name, as)
+      def graphql_field_to_grouping(name, as, **options)
         column_def = column(as || name)
         association_def = association(as || name)
 
@@ -196,9 +204,10 @@ module Graphiform
             type,
             required: false,
             as: as,
-            method_access: false
+            method_access: false,
+            **options
           )
-        end
+        end unless local_graphql_grouping.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
       end
 
       def graphql_add_field_to_type(
@@ -211,7 +220,7 @@ module Graphiform
         as: nil,
         read_prepare: nil,
         read_resolve: nil,
-        **
+        **options
       )
         type = Helpers.graphql_type(type)
         is_resolver = Helpers.resolver?(type)
@@ -231,7 +240,7 @@ module Graphiform
         end
 
         graphql_type.class_eval do
-          added_field = field(field_name, **field_options)
+          added_field = field(field_name, **field_options, **options)
 
           if read_prepare || read_resolve
             define_method(
@@ -244,7 +253,7 @@ module Graphiform
               end
             )
           end
-        end
+        end unless graphql_type.fields.keys.any? { |key| Helpers.equal_graphql_names?(key, field_name) }
       end
 
       def graphql_add_column_field(field_name, column_def, type: nil, null: nil, as: nil, **options)
