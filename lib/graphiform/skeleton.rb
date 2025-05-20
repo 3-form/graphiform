@@ -3,7 +3,6 @@ require 'graphiform/helpers'
 
 module Graphiform
   def self.create_skeleton
-
     # Types
     Helpers.get_const_or_create('Types') do
       Module.new

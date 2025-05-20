@@ -18,7 +18,7 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency 'activerecord', '>= 6.1.0.rc1'
   spec.add_runtime_dependency 'graphql', '~> 1.8'
-  spec.add_runtime_dependency 'scopiform', '~> 0.3.0'
+  spec.add_runtime_dependency 'scopiform', '>= 0.3.0'
 
   spec.add_development_dependency 'appraisal'
   spec.add_development_dependency 'spy'

@@ -11,21 +11,33 @@ module Graphiform
 
     module ClassMethods
       def graphql_type
-        local_demodulized_name = demodulized_name
-        Helpers.get_const_or_create(local_demodulized_name, ::Types) do
-          Class.new(::Types::BaseObject) do
-            graphql_name local_demodulized_name
+        unless defined? @graphql_type
+          local_demodulized_name = demodulized_name
+          @graphql_type = Helpers.get_const_or_create(local_demodulized_name, ::Types) do
+            Class.new(::Types::BaseObject) do
+              graphql_name local_demodulized_name
+            end
+          end
+          @graphql_type.class_eval do
+            field_class Graphiform.configuration[:field_class] if Graphiform.configuration[:field_class].present?
           end
         end
+        @graphql_type
       end
 
       def graphql_input
-        local_demodulized_name = demodulized_name
-        Helpers.get_const_or_create(local_demodulized_name, ::Inputs) do
-          Class.new(::Inputs::BaseInput) do
-            graphql_name "#{local_demodulized_name}Input"
+        unless defined? @graphql_input
+          local_demodulized_name = demodulized_name
+          @graphql_input = Helpers.get_const_or_create(local_demodulized_name, ::Inputs) do
+            Class.new(::Inputs::BaseInput) do
+              graphql_name "#{local_demodulized_name}Input"
+            end
+          end
+          @graphql_input.class_eval do
+            argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
           end
         end
+        @graphql_input
       end
 
       def graphql_filter
@@ -37,6 +49,7 @@ module Graphiform
             end
           end
           @filter.class_eval do
+            argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
             argument 'OR', [self], required: false
             argument 'AND', [self], required: false
           end
@@ -46,21 +59,34 @@ module Graphiform
       end
 
       def graphql_sort
-        local_demodulized_name = demodulized_name
-        Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Sorts) do
-          Class.new(::Inputs::Sorts::BaseSort) do
-            graphql_name "#{local_demodulized_name}Sort"
+        unless defined? @graphql_sort
+          local_demodulized_name = demodulized_name
+          @graphql_sort = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Sorts) do
+            Class.new(::Inputs::Sorts::BaseSort) do
+              graphql_name "#{local_demodulized_name}Sort"
+            end
+          end
+          @graphql_sort.class_eval do
+            argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
           end
         end
+        @graphql_sort
       end
 
       def graphql_grouping
-        local_demodulized_name = demodulized_name
-        Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Groupings) do
-          Class.new(::Inputs::Groupings::BaseGrouping) do
-            graphql_name "#{local_demodulized_name}Grouping"
+        unless defined? @graphql_grouping
+          local_demodulized_name = demodulized_name
+          @graphql_grouping = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Groupings) do
+            Class.new(::Inputs::Groupings::BaseGrouping) do
+              graphql_name "#{local_demodulized_name}Grouping"
+              argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
+            end
+          end
+          @graphql_grouping.class_eval do
+            argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
           end
         end
+        @graphql_grouping
       end
 
       def graphql_edge
