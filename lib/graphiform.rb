@@ -6,6 +6,8 @@ require 'graphiform/active_record_helpers'
 require 'graphiform/core'
 require 'graphiform/fields'
 require 'graphiform/sort_enum'
+require 'graphiform/scope_composer'
+require 'graphiform/preloader_source'
 class GraphiformConfigurationError < StandardError; end
 
 module Graphiform

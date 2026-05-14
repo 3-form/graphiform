@@ -34,7 +34,6 @@ module Graphiform
         write_prepare: nil,
         prepare: nil,
         description: nil,
-        default_value: ::GraphQL::Schema::Argument::NO_DEFAULT,
         as: nil,
         **args
       )
@@ -56,9 +55,7 @@ module Graphiform
             required: required,
             prepare: prepare,
             description: description,
-            default_value: default_value,
             as: as,
-            method_access: false,
             **args
           )
         end unless graphql_input.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
@@ -158,7 +155,6 @@ module Graphiform
             argument_type,
             required: false,
             as: scope_name,
-            method_access: false,
             **options
           )
         end unless graphql_filter.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
@@ -181,7 +177,6 @@ module Graphiform
             type,
             required: false,
             as: as,
-            method_access: false,
             **options
           )
         end unless local_graphql_sort.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
@@ -204,7 +199,6 @@ module Graphiform
             type,
             required: false,
             as: as,
-            method_access: false,
             **options
           )
         end unless local_graphql_grouping.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
@@ -277,7 +271,6 @@ module Graphiform
         read_prepare: nil,
         read_resolve: nil,
         skip_dataloader: false,
-        case_sensitive: Graphiform.configuration[:case_sensitive],
         **options
       )
         unless association_def.klass.respond_to?(:graphql_type)
@@ -304,8 +297,7 @@ module Graphiform
               read_prepare: read_prepare,
               read_resolve: read_resolve,
               null: false,
-              skip_dataloader: true,
-              case_sensitive: case_sensitive
+              skip_dataloader: true
             ),
             false,
             **options
@@ -321,15 +313,13 @@ module Graphiform
                 read_prepare: read_prepare,
                 read_resolve: read_resolve,
                 null: false,
-                skip_dataloader: skip_dataloader,
-                case_sensitive: case_sensitive
+                skip_dataloader: skip_dataloader
               )
             else
               klass.graphql_create_association_resolver(
                 association_def,
                 klass.graphql_type,
-                skip_dataloader: skip_dataloader,
-                case_sensitive: case_sensitive
+                skip_dataloader: skip_dataloader
               )
             end
           )

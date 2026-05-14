@@ -3,7 +3,8 @@
 require 'active_support/concern'
 
 require 'graphiform/helpers'
-require 'graphiform/association_source'
+require 'graphiform/preloader_source'
+require 'graphiform/scope_composer'
 
 module Graphiform
   module Core
@@ -137,11 +138,7 @@ module Graphiform
               end
 
               def apply_built_ins(where: nil, sort: nil, group: nil, **)
-                @value = @value.apply_filters(where.to_h) if where.present? && @value.respond_to?(:apply_filters)
-                @value = @value.apply_sorts(sort.to_h) if sort.present? && @value.respond_to?(:apply_sorts)
-                @value = @value.apply_groupings(group.to_h) if group.present? && @value.respond_to?(:apply_groupings)
-
-                @value
+                @value = Graphiform::ScopeComposer.compose(@value, where: where, sort: sort, group: group)
               end
 
               # Default resolver - meant to be overridden
@@ -201,7 +198,7 @@ module Graphiform
         end
       end
 
-      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, null: true, skip_dataloader: false, case_sensitive: Graphiform.configuration[:case_sensitive], **)
+      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, null: true, skip_dataloader: false, **)
         Class.new(graphql_base_resolver) do
           type resolver_type, null: null
 
@@ -212,7 +209,7 @@ module Graphiform
 
             skip_dataloader ||=
               !association_def ||
-              !Helpers.dataloader_support?(dataloader, association_def, association_def.join_foreign_key) ||
+              !Helpers.dataloader_support?(dataloader, association_def) ||
               read_resolve ||
               read_prepare ||
               args[:group]
@@ -226,35 +223,33 @@ module Graphiform
             else
               dataloader
                 .with(
-                  AssociationSource,
-                  association_def.klass,
-                  association_def.join_primary_key,
+                  Graphiform::PreloaderSource,
+                  association_def.name,
+                  klass: association_def.klass,
                   scope: association_def.scope,
                   where: args[:where],
                   sort: args[:sort],
-                  multi: true,
-                  case_sensitive: case_sensitive,
                 )
-                .load(
-                  @value.public_send(association_def.join_foreign_key)
-                )
+                .load(@value)
             end
           end
         end
       end
 
-      def graphql_create_association_resolver(association_def, resolver_type, null: true, skip_dataloader: false, case_sensitive: nil, **)
+      def graphql_create_association_resolver(association_def, resolver_type, null: true, skip_dataloader: false, **)
         Class.new(::Resolvers::BaseResolver) do
           type resolver_type, null: null
 
           define_method :resolve do |*|
-
-            skip_dataloader ||= !Helpers.dataloader_support?(dataloader, association_def, association_def.join_foreign_key)
-
+            skip_dataloader ||= !Helpers.dataloader_support?(dataloader, association_def)
             return object.public_send(association_def.name) if skip_dataloader
 
-            value = object.public_send(association_def.join_foreign_key)
-            dataloader.with(AssociationSource, association_def.klass, association_def.join_primary_key, scope: association_def.scope, case_sensitive: case_sensitive).load(value)
+            dataloader.with(
+              Graphiform::PreloaderSource,
+              association_def.name,
+              klass: association_def.klass,
+              scope: association_def.scope
+            ).load(object)
           end
         end
       end
