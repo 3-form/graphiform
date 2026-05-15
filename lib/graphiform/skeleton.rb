@@ -3,6 +3,7 @@ require 'graphiform/helpers'
 
 module Graphiform
   def self.create_skeleton
+    return if @skeleton_built
     # Types
     Helpers.get_const_or_create('Types') do
       Module.new
@@ -88,5 +89,6 @@ module Graphiform
     Helpers.get_const_or_create('BaseEnum', ::Enums) do
       Class.new(::GraphQL::Schema::Enum)
     end
+    @skeleton_built = true
   end
 end
