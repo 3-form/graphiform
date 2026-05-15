@@ -28,15 +28,8 @@ module Graphiform
     end
 
     def self.get_const_or_create(const, mod = Object)
-      new_full_const_name = full_const_name("#{mod}::#{const}")
-      new_full_const_name.constantize
-      Object.const_get(new_full_const_name)
-    rescue NameError => e
-      unless full_const_name(e.missing_name) == new_full_const_name.to_s
-        logger.warn "Failed to load #{e.missing_name} when loading constant #{new_full_const_name}"
-        return Object.const_get(new_full_const_name)
-      end
-
+      return mod.const_get(const) if mod.const_defined?(const, false)
+      
       val = yield
       mod.const_set(const, val)
       val
