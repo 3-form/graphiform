@@ -48,17 +48,19 @@ module Graphiform
 
         prepare = write_prepare || prepare
 
-        graphql_input.class_eval do
-          argument(
-            argument_name,
-            argument_type,
-            required: required,
-            prepare: prepare,
-            description: description,
-            as: as,
-            **args
-          )
-        end unless graphql_input.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
+        Helpers.add_unless_exists(graphql_input, argument_name) do
+          graphql_input.class_eval do
+            argument(
+              argument_name,
+              argument_type,
+              required: required,
+              prepare: prepare,
+              description: description,
+              as: as,
+              **args
+            )
+          end
+        end
       end
 
       def graphql_field(
@@ -149,15 +151,17 @@ module Graphiform
         argument_name = "#{argument_prefix}#{argument_attribute}#{argument_suffix}".underscore
         scope_name = scope_def.name
 
-        graphql_filter.class_eval do
-          argument(
-            argument_name,
-            argument_type,
-            required: false,
-            as: scope_name,
-            **options
-          )
-        end unless graphql_filter.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
+        Helpers.add_unless_exists(graphql_filter, argument_name) do
+          graphql_filter.class_eval do
+            argument(
+              argument_name,
+              argument_type,
+              required: false,
+              as: scope_name,
+              **options
+            )
+          end
+        end
       end
 
       def graphql_field_to_sort(name, as, **options)
@@ -171,15 +175,17 @@ module Graphiform
 
         local_graphql_sort = graphql_sort
 
-        local_graphql_sort.class_eval do
-          argument(
-            name,
-            type,
-            required: false,
-            as: as,
-            **options
-          )
-        end unless local_graphql_sort.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
+        Helpers.add_unless_exists(local_graphql_sort, name) do
+          local_graphql_sort.class_eval do
+            argument(
+              name,
+              type,
+              required: false,
+              as: as,
+              **options
+            )
+          end
+        end
       end
 
       def graphql_field_to_grouping(name, as, **options)
@@ -193,15 +199,17 @@ module Graphiform
 
         local_graphql_grouping = graphql_grouping
 
-        local_graphql_grouping.class_eval do
-          argument(
-            name,
-            type,
-            required: false,
-            as: as,
-            **options
-          )
-        end unless local_graphql_grouping.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
+        Helpers.add_unless_exists(local_graphql_grouping, name) do
+          local_graphql_grouping.class_eval do
+            argument(
+              name,
+              type,
+              required: false,
+              as: as,
+              **options
+            )
+          end
+        end
       end
 
       def graphql_add_field_to_type(
@@ -233,21 +241,23 @@ module Graphiform
           field_options[:null] = null
         end
 
-        graphql_type.class_eval do
-          added_field = field(field_name, **field_options, **options)
+        Helpers.add_unless_exists(graphql_type, field_name) do
+          graphql_type.class_eval do
+            added_field = field(field_name, **field_options, **options)
 
-          if read_prepare || read_resolve
-            define_method(
-              added_field.method_sym,
-              lambda do
-                value = read_resolve ? instance_exec(object, context, &read_resolve) : object.public_send(added_field.method_sym)
-                value = instance_exec(value, context, &read_prepare) if read_prepare
+            if read_prepare || read_resolve
+              define_method(
+                added_field.method_sym,
+                lambda do
+                  value = read_resolve ? instance_exec(object, context, &read_resolve) : object.public_send(added_field.method_sym)
+                  value = instance_exec(value, context, &read_prepare) if read_prepare
 
-                value
-              end
-            )
+                  value
+                end
+              )
+            end
           end
-        end unless graphql_type.fields.keys.any? { |key| Helpers.equal_graphql_names?(key, field_name) }
+        end
       end
 
       def graphql_add_column_field(field_name, column_def, type: nil, null: nil, as: nil, **options)

@@ -32,6 +32,7 @@ module Graphiform
           @graphql_input = Helpers.get_const_or_create(local_demodulized_name, ::Inputs) do
             Class.new(::Inputs::BaseInput) do
               graphql_name "#{local_demodulized_name}Input"
+              has_no_arguments(true)
             end
           end
           @graphql_input.class_eval do
@@ -47,13 +48,14 @@ module Graphiform
           @filter = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Filters) do
             Class.new(::Inputs::Filters::BaseFilter) do
               graphql_name "#{local_demodulized_name}Filter"
+              has_no_arguments(true)
             end
           end
           @filter.class_eval do
             argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
-            argument 'OR', [self], required: false
-            argument 'AND', [self], required: false
           end
+          Helpers.add_unless_exists(@filter, 'OR')  { @filter.class_eval { argument 'OR',  [self], required: false } }
+          Helpers.add_unless_exists(@filter, 'AND') { @filter.class_eval { argument 'AND', [self], required: false } }
         end
 
         @filter
@@ -65,6 +67,7 @@ module Graphiform
           @graphql_sort = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Sorts) do
             Class.new(::Inputs::Sorts::BaseSort) do
               graphql_name "#{local_demodulized_name}Sort"
+              has_no_arguments(true)
             end
           end
           @graphql_sort.class_eval do
@@ -81,6 +84,7 @@ module Graphiform
             Class.new(::Inputs::Groupings::BaseGrouping) do
               graphql_name "#{local_demodulized_name}Grouping"
               argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
+              has_no_arguments(true)
             end
           end
           @graphql_grouping.class_eval do
