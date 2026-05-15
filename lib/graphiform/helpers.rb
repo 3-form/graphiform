@@ -40,8 +40,17 @@ module Graphiform
       return set if set
 
       set = Set.new
-      set.merge(klass.arguments.each_key.map { |k| normalize_graphql_name(k) }) if klass.respond_to?(:arguments)
-      set.merge(klass.fields.each_key.map     { |k| normalize_graphql_name(k) }) if klass.respond_to?(:fields)
+
+      if klass.respond_to?(:own_arguments)
+        own_args = klass.instance_variable_get(:@own_arguments) || {}
+        set.merge(own_args.each_key.map { |k| normalize_graphql_name(k) })
+      end
+
+      if klass.respond_to?(:fields)
+        own_fields = klass.instance_variable_get(:@own_fields) || {}
+        set.merge(own_fields.each_key.map { |k| normalize_graphql_name(k) })
+      end
+
       klass.instance_variable_set(:@graphiform_names, set)
     end
 
@@ -92,10 +101,14 @@ module Graphiform
     end
 
     def self.association_arguments_valid?(association_def, method)
-      association_def.present? &&
-        association_def.klass.respond_to?(method) &&
-        association_def.klass.send(method).respond_to?(:arguments) &&
-        !association_def.klass.send(method).arguments.empty?
+      return false unless association_def.present?
+      return false unless association_def.klass.respond_to?(method)
+
+      target = association_def.klass.send(method)
+      return false unless target.respond_to?(:arguments)
+
+      own_args = target.instance_variable_get(:@own_arguments) || {}
+      !own_args.empty?
     end
 
     def self.dataloader_support?(dataloader, association_def)

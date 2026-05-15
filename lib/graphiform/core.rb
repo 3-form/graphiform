@@ -199,8 +199,8 @@ module Graphiform
             end
 
             argument :where, local_graphql_filter, required: false
-            argument :sort, local_graphql_sort, required: false unless local_graphql_sort.arguments.empty?
-            argument :group, local_graphql_grouping, required: false unless local_graphql_grouping.arguments.empty?
+            argument :sort, local_graphql_sort, required: false unless local_graphql_sort.own_arguments.empty?
+            argument :group, local_graphql_grouping, required: false unless local_graphql_grouping.own_arguments.empty?
           end
         end
 
