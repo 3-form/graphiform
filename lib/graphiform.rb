@@ -1,13 +1,13 @@
 require 'scopiform'
-
 require 'graphiform/skeleton'
-
 require 'graphiform/active_record_helpers'
+require 'graphiform/deferred'
 require 'graphiform/core'
 require 'graphiform/fields'
 require 'graphiform/sort_enum'
 require 'graphiform/scope_composer'
 require 'graphiform/preloader_source'
+require 'graphiform/resolver_cache'
 class GraphiformConfigurationError < StandardError; end
 
 module Graphiform
@@ -16,7 +16,6 @@ module Graphiform
 
     base.class_eval do
       include Scopiform
-
       include Graphiform::ActiveRecordHelpers
       include Graphiform::Core
       include Graphiform::Fields
@@ -30,20 +29,14 @@ module Graphiform
         text: GraphQL::Types::String,
         # nchar: GraphQL::Types::String,
         varchar: GraphQL::Types::String,
-
         date: GraphQL::Types::ISO8601Date,
-
         time: GraphQL::Types::ISO8601DateTime,
         datetime: GraphQL::Types::ISO8601DateTime,
         timestamp: GraphQL::Types::ISO8601DateTime,
-
         integer: GraphQL::Types::Int,
-
         float: GraphQL::Types::Float,
         decimal: GraphQL::Types::Float,
-
         boolean: GraphQL::Types::Boolean,
-
         json: GraphQL::Types::JSON,
         jsonb: GraphQL::Types::JSON,
       },
@@ -52,6 +45,7 @@ module Graphiform
 
   def self.configure
     yield(configuration)
+
     if configuration[:field_class].present? && configuration[:argument_class].blank?
       raise GraphiformConfigurationError, 'If field_class is provided an argument class must also be provided'
     elsif configuration[:field_class].blank? && configuration[:argument_class].present?

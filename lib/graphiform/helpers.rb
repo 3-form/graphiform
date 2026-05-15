@@ -1,7 +1,33 @@
 # frozen_string_literal: true
+require 'set'
 
 module Graphiform
   module Helpers
+    def self.canonical_graphql_name(name)
+      name.to_s.camelize(:lower)
+    end
+
+    def self.seen_names(type, bucket)
+      ivar = :"@_graphiform_seen_#{bucket}"
+      cached = type.instance_variable_get(ivar)
+      return cached if cached
+
+      set = Set.new
+      existing_keys =
+        case bucket
+        when :arguments then type.arguments.keys
+        when :fields    then type.fields.keys
+        else raise ArgumentError, "Unknown Graphiform seen_names bucket: #{bucket.inspect}"
+        end
+      existing_keys.each { |k| set.add(canonical_graphql_name(k)) }
+      type.instance_variable_set(ivar, set)
+      set
+    end
+
+    def self.seen_names_add?(type, bucket, name)
+      seen_names(type, bucket).add?(canonical_graphql_name(name)) ? true : false
+    end
+
     def self.logger
       return Rails.logger if Rails.logger.present?
 
@@ -53,11 +79,18 @@ module Graphiform
       name
     end
 
-    def self.association_arguments_valid?(association_def, method)
-      association_def.present? &&
-        association_def.klass.respond_to?(method) &&
-        association_def.klass.send(method).respond_to?(:arguments) &&
-        !association_def.klass.send(method).arguments.empty?
+    def self.association_arguments_valid?(association_def, _method_name)
+      return false unless association_def
+      return false if association_def.options && association_def.options[:polymorphic]
+
+      klass = begin
+        association_def.klass
+      rescue StandardError
+        nil
+      end
+      return false unless klass
+
+      klass.include?(Graphiform)
     end
 
     def self.dataloader_support?(dataloader, association_def)
