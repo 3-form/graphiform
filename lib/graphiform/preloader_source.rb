@@ -1,5 +1,7 @@
 # frozen_string_literal: true
-
+require 'graphql'
+require 'graphql/dataloader'
+require 'graphql/dataloader/source'
 require 'graphql/dataloader/active_record_association_source'
 require 'graphiform/scope_composer'
 
