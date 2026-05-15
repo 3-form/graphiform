@@ -22,9 +22,11 @@ module Graphiform
         graphql_add_association_field(name, association_def, read_prepare: read_prepare, null: null, as: as, **options) if association_def.present?
         graphql_add_method_field(name, read_prepare: read_prepare, null: null, as: as, **options) unless column_def.present? || association_def.present?
 
-        graphql_add_scopes_to_filter(name, identifier, **options)
-        graphql_field_to_sort(name, identifier, **options)
-        graphql_field_to_grouping(name, identifier, **options)
+        # Defer filter/sort/grouping wiring — flushed on first access to
+        # graphql_filter / graphql_sort / graphql_grouping.
+        graphiform_pending_filters   << [name, identifier, options]
+        graphiform_pending_sorts     << [name, identifier, options]
+        graphiform_pending_groupings << [name, identifier, options]
       end
 
       def graphql_writable_field(
