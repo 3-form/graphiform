@@ -1,4 +1,4 @@
-class CreateThirds < ActiveRecord::Migration[6.0]
+class CreateThirds < ActiveRecord::Migration[7.1]
   def change
     create_table :thirds do |t|
       t.references :second, foreign_key: true

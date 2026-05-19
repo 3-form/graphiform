@@ -3,7 +3,8 @@
 require 'active_support/concern'
 
 require 'graphiform/helpers'
-require 'graphiform/association_source'
+require 'graphiform/preloader_source'
+require 'graphiform/scope_composer'
 
 module Graphiform
   module Core
@@ -43,49 +44,87 @@ module Graphiform
       def graphql_filter
         unless defined? @filter
           local_demodulized_name = demodulized_name
+          model_class = self
           @filter = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Filters) do
             Class.new(::Inputs::Filters::BaseFilter) do
               graphql_name "#{local_demodulized_name}Filter"
+
+              define_singleton_method(:arguments) do |context = nil|
+                model_class.send(:flush_pending_filters!)
+                super(context)
+              end
+
+              define_singleton_method(:own_arguments) do
+                model_class.send(:flush_pending_filters!)
+                super()
+              end
             end
           end
           @filter.class_eval do
             argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
-            argument 'OR', [self], required: false
-            argument 'AND', [self], required: false
           end
+          Helpers.add_unless_exists(@filter, 'OR')  { @filter.class_eval { argument 'OR',  [self], required: false } }
+          Helpers.add_unless_exists(@filter, 'AND') { @filter.class_eval { argument 'AND', [self], required: false } }
         end
 
+        flush_pending_filters!
         @filter
       end
 
       def graphql_sort
         unless defined? @graphql_sort
           local_demodulized_name = demodulized_name
+          model_class = self
           @graphql_sort = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Sorts) do
             Class.new(::Inputs::Sorts::BaseSort) do
               graphql_name "#{local_demodulized_name}Sort"
+
+              define_singleton_method(:arguments) do |context = nil|
+                model_class.send(:flush_pending_sorts!)
+                super(context)
+              end
+
+              define_singleton_method(:own_arguments) do
+                model_class.send(:flush_pending_sorts!)
+                super()
+              end
             end
           end
           @graphql_sort.class_eval do
             argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
           end
         end
+
+        flush_pending_sorts!
         @graphql_sort
       end
 
       def graphql_grouping
         unless defined? @graphql_grouping
           local_demodulized_name = demodulized_name
+          model_class = self
           @graphql_grouping = Helpers.get_const_or_create(local_demodulized_name, ::Inputs::Groupings) do
             Class.new(::Inputs::Groupings::BaseGrouping) do
               graphql_name "#{local_demodulized_name}Grouping"
               argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
+
+              define_singleton_method(:arguments) do |context = nil|
+                model_class.send(:flush_pending_groupings!)
+                super(context)
+              end
+
+              define_singleton_method(:own_arguments) do
+                model_class.send(:flush_pending_groupings!)
+                super()
+              end
             end
           end
           @graphql_grouping.class_eval do
             argument_class Graphiform.configuration[:argument_class] if Graphiform.configuration[:argument_class].present?
           end
         end
+
+        flush_pending_groupings!
         @graphql_grouping
       end
 
@@ -137,11 +176,7 @@ module Graphiform
               end
 
               def apply_built_ins(where: nil, sort: nil, group: nil, **)
-                @value = @value.apply_filters(where.to_h) if where.present? && @value.respond_to?(:apply_filters)
-                @value = @value.apply_sorts(sort.to_h) if sort.present? && @value.respond_to?(:apply_sorts)
-                @value = @value.apply_groupings(group.to_h) if group.present? && @value.respond_to?(:apply_groupings)
-
-                @value
+                @value = Graphiform::ScopeComposer.compose(@value, where: where, sort: sort, group: group)
               end
 
               # Default resolver - meant to be overridden
@@ -164,8 +199,8 @@ module Graphiform
             end
 
             argument :where, local_graphql_filter, required: false
-            argument :sort, local_graphql_sort, required: false unless local_graphql_sort.arguments.empty?
-            argument :group, local_graphql_grouping, required: false unless local_graphql_grouping.arguments.empty?
+            argument :sort, local_graphql_sort, required: false unless local_graphql_sort.own_arguments.empty?
+            argument :group, local_graphql_grouping, required: false unless local_graphql_grouping.own_arguments.empty?
           end
         end
 
@@ -201,7 +236,7 @@ module Graphiform
         end
       end
 
-      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, null: true, skip_dataloader: false, case_sensitive: Graphiform.configuration[:case_sensitive], **)
+      def graphql_create_resolver(method_name, resolver_type = graphql_type, read_prepare: nil, read_resolve: nil, null: true, skip_dataloader: false, **)
         Class.new(graphql_base_resolver) do
           type resolver_type, null: null
 
@@ -212,7 +247,7 @@ module Graphiform
 
             skip_dataloader ||=
               !association_def ||
-              !Helpers.dataloader_support?(dataloader, association_def, association_def.join_foreign_key) ||
+              !Helpers.dataloader_support?(dataloader, association_def) ||
               read_resolve ||
               read_prepare ||
               args[:group]
@@ -226,35 +261,33 @@ module Graphiform
             else
               dataloader
                 .with(
-                  AssociationSource,
-                  association_def.klass,
-                  association_def.join_primary_key,
+                  Graphiform::PreloaderSource,
+                  association_def.name,
+                  klass: association_def.klass,
                   scope: association_def.scope,
                   where: args[:where],
                   sort: args[:sort],
-                  multi: true,
-                  case_sensitive: case_sensitive,
                 )
-                .load(
-                  @value.public_send(association_def.join_foreign_key)
-                )
+                .load(@value)
             end
           end
         end
       end
 
-      def graphql_create_association_resolver(association_def, resolver_type, null: true, skip_dataloader: false, case_sensitive: nil, **)
+      def graphql_create_association_resolver(association_def, resolver_type, null: true, skip_dataloader: false, **)
         Class.new(::Resolvers::BaseResolver) do
           type resolver_type, null: null
 
           define_method :resolve do |*|
-
-            skip_dataloader ||= !Helpers.dataloader_support?(dataloader, association_def, association_def.join_foreign_key)
-
+            skip_dataloader ||= !Helpers.dataloader_support?(dataloader, association_def)
             return object.public_send(association_def.name) if skip_dataloader
 
-            value = object.public_send(association_def.join_foreign_key)
-            dataloader.with(AssociationSource, association_def.klass, association_def.join_primary_key, scope: association_def.scope, case_sensitive: case_sensitive).load(value)
+            dataloader.with(
+              Graphiform::PreloaderSource,
+              association_def.name,
+              klass: association_def.klass,
+              scope: association_def.scope
+            ).load(object)
           end
         end
       end
@@ -272,6 +305,56 @@ module Graphiform
           end
         end
       end
+
+      # --- Pending queues for lazy filter/sort/grouping wiring -------------
+      #
+      # graphql_readable_field pushes entries here instead of immediately
+      # invoking add_scope_def_to_filter / graphql_field_to_sort /
+      # graphql_field_to_grouping. The queues are drained the first time
+      # the corresponding builder is accessed.
+
+      def graphiform_pending_filters
+        @graphiform_pending_filters ||= []
+      end
+
+      def graphiform_pending_sorts
+        @graphiform_pending_sorts ||= []
+      end
+
+      def graphiform_pending_groupings
+        @graphiform_pending_groupings ||= []
+      end
+
+      def flush_pending_filters!
+        return if @graphiform_pending_filters.nil? || @graphiform_pending_filters.empty?
+
+        pending = @graphiform_pending_filters
+        @graphiform_pending_filters = []
+        pending.each do |(name, identifier, options)|
+          graphql_add_scopes_to_filter(name, identifier, **options)
+        end
+      end
+
+      def flush_pending_sorts!
+        return if @graphiform_pending_sorts.nil? || @graphiform_pending_sorts.empty?
+
+        pending = @graphiform_pending_sorts
+        @graphiform_pending_sorts = []
+        pending.each do |(name, identifier, options)|
+          graphql_field_to_sort(name, identifier, **options)
+        end
+      end
+
+      def flush_pending_groupings!
+        return if @graphiform_pending_groupings.nil? || @graphiform_pending_groupings.empty?
+
+        pending = @graphiform_pending_groupings
+        @graphiform_pending_groupings = []
+        pending.each do |(name, identifier, options)|
+          graphql_field_to_grouping(name, identifier, **options)
+        end
+      end
+      # ----------------------------------------------------------------------
 
       private
 

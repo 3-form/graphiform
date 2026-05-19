@@ -1,4 +1,4 @@
-class CreateHasNoFields < ActiveRecord::Migration[6.0]
+class CreateHasNoFields < ActiveRecord::Migration[7.1]
   def change
     create_table :has_no_fields do |t|
       t.references :first, foreign_key: true

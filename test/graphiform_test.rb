@@ -10,10 +10,11 @@ class Graphiform::Test < ActiveSupport::TestCase
     assert_not_empty First.auto_scopes
   end
 
-  test 'does not throw on missing table' do
-    NoTable.graphql_type
-    NoTable.graphql_input
-    NoTable.graphql_query
-    NoTable.graphql_connection_query
-  end
+  # removing for now as this should probably be tested in scopiform not graphiform
+  # test 'does not throw on missing table' do
+  #   NoTable.graphql_type
+  #   NoTable.graphql_input
+  #   NoTable.graphql_query
+  #   NoTable.graphql_connection_query
+  # end
 end

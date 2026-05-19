@@ -1,4 +1,4 @@
-class CreateSeconds < ActiveRecord::Migration[6.0]
+class CreateSeconds < ActiveRecord::Migration[7.1]
   def change
     create_table :seconds do |t|
       t.references :first, foreign_key: true

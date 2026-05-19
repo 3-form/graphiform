@@ -1,13 +1,19 @@
-appraise "rails-4" do
-  gem "rails", "4.2.10"
-  gem "rails_or", "~> 1.1"
-  gem "sqlite3", "~> 1.3.6"
+appraise 'rails-7.1' do
+  gem 'rails', '~> 7.1.6'
+  gem 'sqlite3', '>= 1.6.9', '< 3'
 end
 
-appraise "rails-5" do
-  gem "rails", "5.2.3"
+appraise 'rails-7.2' do
+  gem 'rails', '~> 7.2.3'
+  gem 'sqlite3', '>= 1.6.9'
 end
 
-appraise "rails-6" do
-  gem "rails", "6.0.0"
+appraise 'rails-8.0' do
+  gem 'rails', '~> 8.0.5'
+  gem 'sqlite3', '>= 2.1'
+end
+
+appraise 'rails-8.1' do
+  gem 'rails', '~> 8.1.3'
+  gem 'sqlite3', '>= 2.1'
 end

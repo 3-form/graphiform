@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 git_source(:github) { |repo| 'https://github.com/#{repo}.git' }
 
-gem 'scopiform', :path => '../scopiform'
+gem 'scopiform', '>= 0.4.1'
 
 # Declare your gem's dependencies in graphiform.gemspec.
 # Bundler will treat runtime dependencies like base dependencies, and
@@ -13,9 +13,11 @@ gemspec
 # Git. Remember to move these dependencies to your gemspec before releasing
 # your gem to rubygems.org.
 
-gem 'rails', '>= 6.1.0.rc1'
+gem 'rails', '>= 7.1', '< 8.2'
 
 # To use a debugger
-gem 'byebug', group: [:development, :test]
+gem 'debug', group: [:development, :test]
 
-gem 'sqlite3', '~> 1.4'
+gem 'sqlite3', '>= 1.6.9', group: [:development, :test]
+gem 'simplecov', require: false, group: [:test]
+

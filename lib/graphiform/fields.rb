@@ -22,9 +22,11 @@ module Graphiform
         graphql_add_association_field(name, association_def, read_prepare: read_prepare, null: null, as: as, **options) if association_def.present?
         graphql_add_method_field(name, read_prepare: read_prepare, null: null, as: as, **options) unless column_def.present? || association_def.present?
 
-        graphql_add_scopes_to_filter(name, identifier, **options)
-        graphql_field_to_sort(name, identifier, **options)
-        graphql_field_to_grouping(name, identifier, **options)
+        # Defer filter/sort/grouping wiring — flushed on first access to
+        # graphql_filter / graphql_sort / graphql_grouping.
+        graphiform_pending_filters   << [name, identifier, options]
+        graphiform_pending_sorts     << [name, identifier, options]
+        graphiform_pending_groupings << [name, identifier, options]
       end
 
       def graphql_writable_field(
@@ -34,7 +36,6 @@ module Graphiform
         write_prepare: nil,
         prepare: nil,
         description: nil,
-        default_value: ::GraphQL::Schema::Argument::NO_DEFAULT,
         as: nil,
         **args
       )
@@ -49,19 +50,19 @@ module Graphiform
 
         prepare = write_prepare || prepare
 
-        graphql_input.class_eval do
-          argument(
-            argument_name,
-            argument_type,
-            required: required,
-            prepare: prepare,
-            description: description,
-            default_value: default_value,
-            as: as,
-            method_access: false,
-            **args
-          )
-        end unless graphql_input.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
+        Helpers.add_unless_exists(graphql_input, argument_name) do
+          graphql_input.class_eval do
+            argument(
+              argument_name,
+              argument_type,
+              required: required,
+              prepare: prepare,
+              description: description,
+              as: as,
+              **args
+            )
+          end
+        end
       end
 
       def graphql_field(
@@ -152,16 +153,17 @@ module Graphiform
         argument_name = "#{argument_prefix}#{argument_attribute}#{argument_suffix}".underscore
         scope_name = scope_def.name
 
-        graphql_filter.class_eval do
-          argument(
-            argument_name,
-            argument_type,
-            required: false,
-            as: scope_name,
-            method_access: false,
-            **options
-          )
-        end unless graphql_filter.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, argument_name) }
+        Helpers.add_unless_exists(graphql_filter, argument_name) do
+          graphql_filter.class_eval do
+            argument(
+              argument_name,
+              argument_type,
+              required: false,
+              as: scope_name,
+              **options
+            )
+          end
+        end
       end
 
       def graphql_field_to_sort(name, as, **options)
@@ -175,16 +177,17 @@ module Graphiform
 
         local_graphql_sort = graphql_sort
 
-        local_graphql_sort.class_eval do
-          argument(
-            name,
-            type,
-            required: false,
-            as: as,
-            method_access: false,
-            **options
-          )
-        end unless local_graphql_sort.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
+        Helpers.add_unless_exists(local_graphql_sort, name) do
+          local_graphql_sort.class_eval do
+            argument(
+              name,
+              type,
+              required: false,
+              as: as,
+              **options
+            )
+          end
+        end
       end
 
       def graphql_field_to_grouping(name, as, **options)
@@ -198,16 +201,17 @@ module Graphiform
 
         local_graphql_grouping = graphql_grouping
 
-        local_graphql_grouping.class_eval do
-          argument(
-            name,
-            type,
-            required: false,
-            as: as,
-            method_access: false,
-            **options
-          )
-        end unless local_graphql_grouping.arguments.keys.any? { |key| Helpers.equal_graphql_names?(key, name) }
+        Helpers.add_unless_exists(local_graphql_grouping, name) do
+          local_graphql_grouping.class_eval do
+            argument(
+              name,
+              type,
+              required: false,
+              as: as,
+              **options
+            )
+          end
+        end
       end
 
       def graphql_add_field_to_type(
@@ -239,21 +243,23 @@ module Graphiform
           field_options[:null] = null
         end
 
-        graphql_type.class_eval do
-          added_field = field(field_name, **field_options, **options)
+        Helpers.add_unless_exists(graphql_type, field_name) do
+          graphql_type.class_eval do
+            added_field = field(field_name, **field_options, **options)
 
-          if read_prepare || read_resolve
-            define_method(
-              added_field.method_sym,
-              lambda do
-                value = read_resolve ? instance_exec(object, context, &read_resolve) : object.public_send(added_field.method_sym)
-                value = instance_exec(value, context, &read_prepare) if read_prepare
+            if read_prepare || read_resolve
+              define_method(
+                added_field.method_sym,
+                lambda do
+                  value = read_resolve ? instance_exec(object, context, &read_resolve) : object.public_send(added_field.method_sym)
+                  value = instance_exec(value, context, &read_prepare) if read_prepare
 
-                value
-              end
-            )
+                  value
+                end
+              )
+            end
           end
-        end unless graphql_type.fields.keys.any? { |key| Helpers.equal_graphql_names?(key, field_name) }
+        end
       end
 
       def graphql_add_column_field(field_name, column_def, type: nil, null: nil, as: nil, **options)
@@ -277,7 +283,6 @@ module Graphiform
         read_prepare: nil,
         read_resolve: nil,
         skip_dataloader: false,
-        case_sensitive: Graphiform.configuration[:case_sensitive],
         **options
       )
         unless association_def.klass.respond_to?(:graphql_type)
@@ -304,8 +309,7 @@ module Graphiform
               read_prepare: read_prepare,
               read_resolve: read_resolve,
               null: false,
-              skip_dataloader: true,
-              case_sensitive: case_sensitive
+              skip_dataloader: true
             ),
             false,
             **options
@@ -321,15 +325,13 @@ module Graphiform
                 read_prepare: read_prepare,
                 read_resolve: read_resolve,
                 null: false,
-                skip_dataloader: skip_dataloader,
-                case_sensitive: case_sensitive
+                skip_dataloader: skip_dataloader
               )
             else
               klass.graphql_create_association_resolver(
                 association_def,
                 klass.graphql_type,
-                skip_dataloader: skip_dataloader,
-                case_sensitive: case_sensitive
+                skip_dataloader: skip_dataloader
               )
             end
           )

@@ -29,6 +29,11 @@ class First < ApplicationRecord
   graphql_field :alias_seconds, as: :seconds, writable: true
   graphql_field :alias_basic_method, type: :string, as: :basic_method, writable: true
 
+  graphql_field :seconds_with_prepare,
+                as: :seconds,
+                writable: false,
+                read_prepare: ->(value, _ctx) { value.where("name LIKE ?", "%-0") }
+
   def basic_method
     'response'
   end

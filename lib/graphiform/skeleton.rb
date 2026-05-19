@@ -88,5 +88,6 @@ module Graphiform
     Helpers.get_const_or_create('BaseEnum', ::Enums) do
       Class.new(::GraphQL::Schema::Enum)
     end
+
   end
 end

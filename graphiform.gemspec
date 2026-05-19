@@ -7,8 +7,8 @@ require 'graphiform/version'
 Gem::Specification.new do |spec|
   spec.name        = 'graphiform'
   spec.version     = Graphiform::VERSION
-  spec.authors     = ['jayce.pulsipher']
-  spec.email       = ['jayce.pulsipher@3-form.com']
+  spec.authors     = ['jayce.pulsipher', 'zack.denkers']
+  spec.email       = ['jayce.pulsipher@3-form.com', 'zack.denkers@3-form.com']
   spec.homepage    = 'https://github.com/3-form/graphiform'
   spec.summary     = 'Generate GraphQL types, inputs, resolvers, queries, and connections based off whitelisted column and association definitions'
   # spec.description = ' Description of Graphiform.'
@@ -16,11 +16,15 @@ Gem::Specification.new do |spec|
 
   spec.files = Dir['{app,config,db,lib}/**/*', 'MIT-LICENSE', 'Rakefile', 'README.md']
 
-  spec.add_runtime_dependency 'activerecord', '>= 6.1.0.rc1'
-  spec.add_runtime_dependency 'graphql', '~> 1.8'
-  spec.add_runtime_dependency 'scopiform', '>= 0.3.0'
+  spec.required_ruby_version = '>= 3.1'
+
+  spec.add_runtime_dependency 'activerecord', '>= 7.1', '< 8.2'
+  spec.add_runtime_dependency 'graphql', '>= 2.5.4', '< 2.7'
+  spec.add_runtime_dependency 'scopiform', '>= 0.4.1'
 
   spec.add_development_dependency 'appraisal'
+  spec.add_development_dependency 'minitest', '~> 5.20'
+  spec.add_development_dependency 'rake'
   spec.add_development_dependency 'spy'
   spec.add_development_dependency 'sqlite3'
   spec.add_development_dependency 'warning'

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'set'
+
 module Graphiform
   module Helpers
     def self.logger
@@ -8,6 +10,62 @@ module Graphiform
       @logger ||= Logger.new($stdout)
       @logger
     end
+
+    # --- Name normalization & per-class registries -------------------------
+    #
+    # Replaces the O(n) `arguments.keys.any? { equal_graphql_names?(...) }`
+    # scan (and its repeated string allocations) with an O(1) Set lookup.
+
+    NAME_NORMALIZE_CACHE = {}
+    NAME_NORMALIZE_MUTEX = Mutex.new
+
+    # Canonicalize a name the same way graphql-ruby presents it externally,
+    # so `:my_field`, `"my_field"`, `"myField"`, `"MyField"` all collide.
+    def self.normalize_graphql_name(name)
+      key = name.is_a?(Symbol) ? name : name.to_s
+      cached = NAME_NORMALIZE_CACHE[key]
+      return cached if cached
+
+      NAME_NORMALIZE_MUTEX.synchronize do
+        NAME_NORMALIZE_CACHE[key] ||= key.to_s.camelize(:lower).freeze
+      end
+    end
+
+    # Fetch (and lazily seed) the registered-names Set for a generated
+    # GraphQL class. Seeding from existing `arguments` / `fields` makes this
+    # safe even when classes are pre-populated (e.g. `OR`/`AND` on filters,
+    # or manual user-defined args).
+    def self.tracked_names(klass)
+      set = klass.instance_variable_get(:@graphiform_names)
+      return set if set
+
+      set = Set.new
+
+      if klass.respond_to?(:own_arguments)
+        own_args = klass.instance_variable_get(:@own_arguments) || {}
+        set.merge(own_args.each_key.map { |k| normalize_graphql_name(k) })
+      end
+
+      if klass.respond_to?(:fields)
+        own_fields = klass.instance_variable_get(:@own_fields) || {}
+        set.merge(own_fields.each_key.map { |k| normalize_graphql_name(k) })
+      end
+
+      klass.instance_variable_set(:@graphiform_names, set)
+    end
+
+    # Guard helper: yield (which should add the field/argument) only if the
+    # name isn't already present. Returns true when the block ran.
+    def self.add_unless_exists(klass, name)
+      normalized = normalize_graphql_name(name)
+      set = tracked_names(klass)
+      return false if set.include?(normalized)
+
+      yield
+      set << normalized
+      true
+    end
+    # -----------------------------------------------------------------------
 
     def self.graphql_type(active_record_type)
       is_array = active_record_type.is_a? Array
@@ -28,22 +86,11 @@ module Graphiform
     end
 
     def self.get_const_or_create(const, mod = Object)
-      new_full_const_name = full_const_name("#{mod}::#{const}")
-      new_full_const_name.constantize
-      Object.const_get(new_full_const_name)
-    rescue NameError => e
-      unless full_const_name(e.missing_name) == new_full_const_name.to_s
-        logger.warn "Failed to load #{e.missing_name} when loading constant #{new_full_const_name}"
-        return Object.const_get(new_full_const_name)
-      end
-
+      return mod.const_get(const) if mod.const_defined?(const, false)
+      
       val = yield
       mod.const_set(const, val)
       val
-    end
-
-    def self.equal_graphql_names?(key, name)
-      key.downcase == name.to_s.camelize.downcase || key.downcase == name.to_s.downcase
     end
 
     def self.full_const_name(name)
@@ -54,25 +101,21 @@ module Graphiform
     end
 
     def self.association_arguments_valid?(association_def, method)
-      association_def.present? &&
-        association_def.klass.respond_to?(method) &&
-        association_def.klass.send(method).respond_to?(:arguments) &&
-        !association_def.klass.send(method).arguments.empty?
+      return false unless association_def.present?
+      return false unless association_def.klass.respond_to?(method)
+
+      target = association_def.klass.send(method)
+      return false unless target.respond_to?(:arguments)
+
+      own_args = target.instance_variable_get(:@own_arguments) || {}
+      !own_args.empty?
     end
 
-    def self.dataloader_support?(dataloader, association_def, keys)
-      (
-        association_def.present? &&
+    def self.dataloader_support?(dataloader, association_def)
+      association_def.present? &&
         !association_def.polymorphic? &&
-        !association_def.through_reflection? &&
         !association_def.inverse_of&.polymorphic? &&
-        (
-          !association_def.scope ||
-          association_def.scope.arity.zero?
-        ) &&
-        !keys.is_a?(Array) &&
         !dataloader.is_a?(GraphQL::Dataloader::NullDataloader)
-      )
     end
   end
 end

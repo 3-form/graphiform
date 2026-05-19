@@ -1,4 +1,4 @@
-class CreateHasNoIncludes < ActiveRecord::Migration[6.0]
+class CreateHasNoIncludes < ActiveRecord::Migration[7.1]
   def change
     create_table :has_no_includes do |t|
       t.references :first, foreign_key: true
