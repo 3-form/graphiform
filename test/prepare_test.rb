@@ -2,13 +2,13 @@ require 'test_helper'
 
 class PrepareTest < ActiveSupport::TestCase
   setup do
-    @first_a = First.create(name: 'abc', date: '2010-10-05', number: 5, boolean: true)
-    @first_b = First.create(name: 'ghi', date: '2020-04-10', number: 20, boolean: true)
-    @first_c = First.create(name: 'def', date: '2020-05-10', number: 10, boolean: false)
+    @first_a = First.create!(name: 'abc', date: '2010-10-05', number: 5, boolean: true)
+    @first_b = First.create!(name: 'ghi', date: '2020-04-10', number: 20, boolean: true)
+    @first_c = First.create!(name: 'def', date: '2020-05-10', number: 10, boolean: false)
 
-    @second_a = Second.create(first: @first_a, name: 'jayce', number: 10.82, datetime: '2020-03-16 21:17:20')
-    @second_b = Second.create(first: @first_b, name: 'bailey', number: 8, datetime: '2020-03-16 1:17:20')
-    @second_c = Second.create(first: @first_c, name: 'shane', number: 9.5, datetime: '2020-03-16 10:17:20')
+    @second_a = Second.create!(first: @first_a, name: 'jayce', number: 10.82, datetime: '2020-03-16 21:17:20')
+    @second_b = Second.create!(first: @first_b, name: 'bailey', number: 8, datetime: '2020-03-16 1:17:20')
+    @second_c = Second.create!(first: @first_c, name: 'shane', number: 9.5, datetime: '2020-03-16 10:17:20')
 
     query = Class.new(::Types::BaseObject) do
       graphql_name 'test_query'
@@ -83,8 +83,8 @@ class PrepareTest < ActiveSupport::TestCase
     @schema.execute(mutation, variables: variables)
 
     assert_equal 1, resolve_spy.calls.length
-    assert_equal 1, resolve_spy.calls.first.args.length
-    attributes = resolve_spy.calls.first.args.first[:attributes].to_h
+    assert_equal 1, resolve_spy.calls.first.kwargs.length
+    attributes = resolve_spy.calls.first.kwargs[:attributes].to_h
 
     assert_equal 'derp', attributes[:name]
     assert_equal 'gfedcba', attributes[:translate_this]

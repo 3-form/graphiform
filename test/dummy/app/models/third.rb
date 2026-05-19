@@ -1,9 +1,9 @@
 class Third < ApplicationRecord
   include Graphiform
 
-  belongs_to :second
+  belongs_to :second, optional: true
 
-  enum status: { inactive: 0, active: 1, discontinued: 2 }
+  enum :status, { active: 0, inactive: 1, discontinued: 2 }
 
   graphql_fields \
     :name,

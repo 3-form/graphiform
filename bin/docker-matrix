@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CELLS=(
+  test-rails-7.1
+  test-rails-7.2
+  test-rails-8.0
+  test-rails-8.1
+  test-rails-7.2-ruby-3.4
+  test-rails-8.0-ruby-3.4
+  test-rails-8.1-ruby-3.4
+)
+
+# Build once per cell (compose builds in parallel).
+echo "==> Building images..."
+docker compose build "${CELLS[@]}"
+
+PASS=()
+FAIL=()
+
+for cell in "${CELLS[@]}"; do
+  echo ""
+  echo "================================================================"
+  echo "  Running: $cell"
+  echo "================================================================"
+  if docker compose run --rm "$cell"; then
+    PASS+=("$cell")
+  else
+    FAIL+=("$cell")
+  fi
+done
+
+echo ""
+echo "================================================================"
+echo "  Matrix summary"
+echo "================================================================"
+printf '  PASS: %s\n' "${PASS[@]:-<none>}"
+printf '  FAIL: %s\n' "${FAIL[@]:-<none>}"
+
+[ ${#FAIL[@]} -eq 0 ]

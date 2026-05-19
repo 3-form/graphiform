@@ -2,9 +2,9 @@ require 'test_helper'
 
 class EnumsTest < ActiveSupport::TestCase
   setup do
-    @third_a = Third.create(name: 'abc', status: :discontinued)
-    @third_b = Third.create(name: 'def', status: :active)
-    @third_c = Third.create(name: 'ghi', status: :inactive)
+    @third_a = Third.create!(name: 'abc', status: :discontinued)
+    @third_b = Third.create!(name: 'def', status: :active)
+    @third_c = Third.create!(name: 'ghi', status: :inactive)
 
     query = Class.new(::Types::BaseObject) do
       graphql_name 'test_query'
@@ -142,8 +142,8 @@ class EnumsTest < ActiveSupport::TestCase
     assert_equal @third_b.id, resp['data']['mutateThird']['third']['id']
 
     assert_equal 1, resolve_spy.calls.length
-    assert_equal 1, resolve_spy.calls.first.args.length
-    attributes = resolve_spy.calls.first.args.first[:attributes].to_h
+    assert_equal 1, resolve_spy.calls.first.kwargs.length
+    attributes = resolve_spy.calls.first.kwargs[:attributes].to_h
 
     assert_equal 'derp', attributes[:name]
     assert_equal 'discontinued', attributes[:status]

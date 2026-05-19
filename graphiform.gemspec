@@ -16,11 +16,15 @@ Gem::Specification.new do |spec|
 
   spec.files = Dir['{app,config,db,lib}/**/*', 'MIT-LICENSE', 'Rakefile', 'README.md']
 
-  spec.add_runtime_dependency 'activerecord', '>= 6.1.0.rc1'
+  spec.required_ruby_version = '>= 3.1'
+
+  spec.add_runtime_dependency 'activerecord', '>= 7.1', '< 8.2'
   spec.add_runtime_dependency 'graphql', '>= 2.5.4', '< 2.7'
-  spec.add_runtime_dependency 'scopiform', '>= 0.3.0'
+  spec.add_runtime_dependency 'scopiform', '>= 0.4.1'
 
   spec.add_development_dependency 'appraisal'
+  spec.add_development_dependency 'minitest', '~> 5.20'
+  spec.add_development_dependency 'rake'
   spec.add_development_dependency 'spy'
   spec.add_development_dependency 'sqlite3'
   spec.add_development_dependency 'warning'

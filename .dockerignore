@@ -1,0 +1,17 @@
+.git
+.github
+.idea
+.vscode
+tmp
+log
+test/dummy/log
+test/dummy/tmp
+test/dummy/db/*.sqlite3
+test/dummy/db/*.sqlite3-journal
+coverage
+node_modules
+*.gem
+.bundle
+vendor/bundle
+.ruby-lsp
+.byebug_history

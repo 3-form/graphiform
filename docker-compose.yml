@@ -1,0 +1,98 @@
+services:
+  # ---------- Ruby 3.3 cells ----------
+  test-rails-7.1:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.3.6"
+        APPRAISAL: "rails_7.1"
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/test/dummy/tmp
+
+  test-rails-7.2:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.3.6"
+        APPRAISAL: "rails_7.2"
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/test/dummy/tmp
+
+  test-rails-8.0:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.3.6"
+        APPRAISAL: "rails_8.0"
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/test/dummy/tmp
+
+  test-rails-8.1:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.3.6"
+        APPRAISAL: "rails_8.1"
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/test/dummy/tmp
+
+  # ---------- Ruby 3.4 cells (skip 7.1, per CI matrix) ----------
+  test-rails-7.2-ruby-3.4:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.4.1"
+        APPRAISAL: "rails_7.2"
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/test/dummy/tmp
+
+  test-rails-8.0-ruby-3.4:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.4.1"
+        APPRAISAL: "rails_8.0"
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/test/dummy/tmp
+
+  test-rails-8.1-ruby-3.4:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.4.1"
+        APPRAISAL: "rails_8.1"
+    volumes:
+      - .:/app
+    tmpfs:
+      - /app/test/dummy/tmp
+
+  # ---------- Interactive shell for debugging ----------
+  shell:
+    build:
+      context: .
+      args:
+        RUBY_VERSION: "3.3.6"
+        APPRAISAL: "rails_8.1"
+    volumes:
+      - .:/app
+      - bundle-shell:/bundle
+    tmpfs:
+      - /app/test/dummy/tmp
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true
+
+volumes:
+  bundle-shell:
